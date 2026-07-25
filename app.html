@@ -187,6 +187,34 @@
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+  /* ---------- Cloud modal + photos ---------- */
+  .btn.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border));background:var(--accent-weak)}
+  .modal-scrim{position:fixed;inset:0;background:rgba(15,21,33,.5);opacity:0;pointer-events:none;transition:opacity .16s;z-index:50}
+  .modal-scrim.open{opacity:1;pointer-events:auto}
+  .modal{position:fixed;z-index:51;top:50%;left:50%;transform:translate(-50%,-46%) scale(.98);opacity:0;pointer-events:none;
+    width:min(400px,calc(100% - 28px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+    transition:opacity .16s,transform .16s}
+  .modal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+  .modal header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .modal header .t{font-weight:640;font-size:15px}
+  .modal header .btn{margin-left:auto}
+  .modal .body{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .cloud-note{margin:0;font-size:13px;color:var(--text-dim);line-height:1.5}
+  .cloud-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .cloud-actions .btn{flex:1;justify-content:center}
+  .cloud-msg{font-size:12.5px;color:var(--s-blocked);line-height:1.4}
+  .cloud-status{font-size:12.5px;color:var(--text-dim)}
+  .photobox{margin-top:2px}
+  .photo-empty{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .photo-has{display:flex;gap:12px}
+  .photo-has img{width:92px;height:92px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer}
+  .photo-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .photo-meta .nm{font-weight:560;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .photo-meta .sz{font-size:12px;color:var(--text-dim)}
+  .photo-meta .pend{color:var(--s-onhold)}
+  .photo-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+  .photo-ind{display:inline-flex;align-items:center;color:var(--accent);flex:none}
+
   /* ---------- Print ---------- */
   @media print{
     body{background:#fff}
@@ -221,6 +249,9 @@
       </button>
     </div>
 
+    <button class="btn icon" id="cloudBtn" title="Cloud sync / sign in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.98A6 6 0 0 0 6.3 9.5 4 4 0 0 0 6.5 17.5"/><path d="M9.5 13.5 12 11l2.5 2.5M12 11v7"/></svg>
+    </button>
     <button class="btn icon" id="themeBtn" title="Toggle light / dark">
       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
     </button>
@@ -368,6 +399,12 @@
 
     <div class="field"><label for="fDep">Dependency / Kebergantungan</label><input id="fDep" type="text" placeholder="e.g. 1.2 (WBS of predecessor)"></div>
     <div class="field"><label for="fRemark">Remarks / Catatan</label><textarea id="fRemark" placeholder="Notes, blockers, acceptance criteria…"></textarea></div>
+
+    <div class="field">
+      <label>Task photo / Gambar tugas</label>
+      <div id="photoBox" class="photobox"></div>
+      <input type="file" id="fPhoto" accept="image/*" style="display:none">
+    </div>
   </div>
   <footer>
     <button class="btn" id="addSub">+ Sub-task</button>
@@ -377,14 +414,32 @@
   </footer>
 </aside>
 
+<!-- Cloud sync modal -->
+<div class="modal-scrim" id="cloudScrim"></div>
+<aside class="modal" id="cloudModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <header>
+    <span class="t">Cloud sync</span>
+    <button class="btn icon" id="cloudClose" title="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </header>
+  <div class="body" id="cloudBody"></div>
+</aside>
+
 <input type="file" id="importFile" accept="application/json" style="display:none">
 
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v1", VERSION="v1";
+  var LS_KEY="pm_tracker_v1", VERSION="v2";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
+
+  // ---- Supabase (URL + publishable/anon key are safe in client code; RLS protects data) ----
+  var SB_URL="https://xopvxkrorsndcvbtxnlw.supabase.co";
+  var SB_KEY="sb_publishable_i4ziX1HX3s0_m9OQuuXcZA_C8j-Gx9V";
+  var BUCKET="task-photos";
+  var AUTH_KEY="pm_auth_v1", MERGE_KEY="pm_merged_for";
+  var auth=null;                 // {access_token,refresh_token,expires_at,user_id,email}
+  var pushTimer=null, pollTimer=null, lastSync=0;
 
   /* ---------------- State ---------------- */
   var STATUS=[
@@ -430,7 +485,10 @@
     }catch(e){}
     return seed();
   }
-  function save(){ try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){} }
+  function persist(){ try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){} }
+  // save() = a user-initiated change: stamp updatedAt, persist locally, and queue a cloud push.
+  function save(){ state.updatedAt=nowISO(); persist(); schedulePush(); }
+  function nowISO(){ return new Date().toISOString(); }
 
   function activeProject(){
     var p=state.projects.filter(function(x){return x.id===state.activeProjectId;})[0];
@@ -442,6 +500,264 @@
   function children(id){return tasks().filter(function(t){return t.parentId===id;});}
   function roots(){return tasks().filter(function(t){return !t.parentId;});}
   function hasChildren(id){return children(id).length>0;}
+
+  /* ================= Cloud sync (Supabase REST) ================= */
+  function loadAuth(){ try{var r=localStorage.getItem(AUTH_KEY); if(r)auth=JSON.parse(r);}catch(e){} }
+  function saveAuth(){ try{ auth?localStorage.setItem(AUTH_KEY,JSON.stringify(auth)):localStorage.removeItem(AUTH_KEY);}catch(e){} }
+  function signedIn(){ return !!(auth&&auth.refresh_token); }
+
+  function setSession(s){
+    if(!s||!s.access_token)return false;
+    auth={access_token:s.access_token, refresh_token:s.refresh_token,
+      expires_at:Date.now()+((s.expires_in||3600)*1000),
+      user_id:(s.user&&s.user.id)||(auth&&auth.user_id),
+      email:(s.user&&s.user.email)||(auth&&auth.email)};
+    saveAuth(); return true;
+  }
+  function sbAuth(path,body){
+    return fetch(SB_URL+"/auth/v1/"+path,{method:"POST",
+      headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)})
+      .then(function(r){ return r.json().then(function(j){return {ok:r.ok,status:r.status,j:j};}); });
+  }
+  function ensureToken(){
+    if(!signedIn())return Promise.reject("not signed in");
+    if(auth.access_token && Date.now()<auth.expires_at-60000)return Promise.resolve();
+    return sbAuth("token?grant_type=refresh_token",{refresh_token:auth.refresh_token}).then(function(r){
+      if(r.ok&&r.j.access_token)setSession(r.j); else throw "session expired";
+    });
+  }
+  function sbRest(path,opts){
+    opts=opts||{};
+    return ensureToken().then(function(){
+      var h=Object.assign({apikey:SB_KEY,Authorization:"Bearer "+auth.access_token,"Content-Type":"application/json"},opts.headers||{});
+      return fetch(SB_URL+"/rest/v1/"+path,{method:opts.method||"GET",headers:h,body:opts.body});
+    });
+  }
+  function doSignIn(email,pw,create){
+    return sbAuth(create?"signup":"token?grant_type=password",{email:email,password:pw}).then(function(r){
+      if(!r.ok)throw (r.j&&(r.j.msg||r.j.error_description||r.j.error||r.j.message))||("Failed ("+r.status+")");
+      if(r.j.access_token){ setSession(r.j); return "in"; }
+      return "confirm";   // signup with email-confirmation enabled: no session yet
+    });
+  }
+  function signOut(){
+    stopSync(); auth=null; saveAuth();
+    try{localStorage.removeItem(MERGE_KEY);}catch(e){}
+    updateCloudUI(); renderCloudModal();
+    if(editingId){var t=taskById(editingId); if(t)renderPhotoSection(t);}
+  }
+
+  function pullRemote(){
+    return sbRest("user_state?user_id=eq."+encodeURIComponent(auth.user_id)+"&select=data,updated_at")
+      .then(function(r){return r.json();})
+      .then(function(rows){ return (rows&&rows.length)?rows[0]:null; });
+  }
+  function pushRemote(){
+    var body=JSON.stringify({user_id:auth.user_id,data:state,updated_at:state.updatedAt||nowISO()});
+    return sbRest("user_state?on_conflict=user_id",{method:"POST",
+      headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:body});
+  }
+  // First sign-in on a device: fold remote data into local by id so nothing is clobbered.
+  function mergeStates(remote){
+    if(!remote||!remote.projects)return;
+    var byId={}; state.projects.forEach(function(p){byId[p.id]=p;});
+    remote.projects.forEach(function(rp){
+      var lp=byId[rp.id];
+      if(!lp){ state.projects.push(rp); }
+      else{ var seen={}; lp.tasks.forEach(function(x){seen[x.id]=1;});
+        (rp.tasks||[]).forEach(function(rt){ if(!seen[rt.id])lp.tasks.push(rt); }); }
+    });
+  }
+  function adoptRemote(remote){
+    state=remote.data; state.updatedAt=remote.updated_at;
+    if(!state.projects.some(function(p){return p.id===state.activeProjectId;}))
+      state.activeProjectId=state.projects[0]?state.projects[0].id:"";
+    persist(); refreshAll();
+    if(editingId && !taskById(editingId)) closeDrawer();
+  }
+  function syncPull(){
+    if(!signedIn())return Promise.resolve();
+    return pullRemote().then(function(remote){
+      if(remote && remote.updated_at && (!state.updatedAt || remote.updated_at>state.updatedAt)) adoptRemote(remote);
+      lastSync=Date.now(); updateSyncStatus();
+    }).catch(function(){});
+  }
+  function schedulePush(){
+    if(!signedIn())return;
+    clearTimeout(pushTimer);
+    pushTimer=setTimeout(function(){ pushRemote().then(function(){lastSync=Date.now();updateSyncStatus();}).catch(function(){}); },1500);
+  }
+  function startSync(){
+    if(!signedIn())return;
+    clearInterval(pollTimer);
+    var mergedFor=null; try{mergedFor=localStorage.getItem(MERGE_KEY);}catch(e){}
+    var first=(mergedFor!==auth.user_id);
+    pullRemote().then(function(remote){
+      if(first){
+        if(remote&&remote.data)mergeStates(remote.data);
+        state.updatedAt=nowISO(); persist(); refreshAll();
+        try{localStorage.setItem(MERGE_KEY,auth.user_id);}catch(e){}
+        return pushRemote();
+      }else if(remote && remote.updated_at && (!state.updatedAt || remote.updated_at>state.updatedAt)){
+        adoptRemote(remote);
+      }else{
+        return pushRemote();
+      }
+    }).then(function(){ lastSync=Date.now(); updateSyncStatus(); uploadPending(); }).catch(function(){ updateSyncStatus(); });
+    pollTimer=setInterval(syncPull,25000);
+  }
+  function stopSync(){ clearInterval(pollTimer); clearTimeout(pushTimer); }
+
+  /* ================= Photos (compress + IndexedDB cache + Storage) ================= */
+  var _db=null, _signCache={};
+  function idb(){ return new Promise(function(res,rej){
+    if(_db){res(_db);return;}
+    try{ var r=indexedDB.open("pm_photos",1);
+      r.onupgradeneeded=function(){ r.result.createObjectStore("photos"); };
+      r.onsuccess=function(){ _db=r.result; res(_db); };
+      r.onerror=function(){ rej(r.error); };
+    }catch(e){ rej(e); }
+  }); }
+  function idbPut(k,v){ return idb().then(function(db){ return new Promise(function(res,rej){ var tx=db.transaction("photos","readwrite"); tx.objectStore("photos").put(v,k); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }).catch(function(){}); }
+  function idbGet(k){ return idb().then(function(db){ return new Promise(function(res){ var tx=db.transaction("photos","readonly"); var rq=tx.objectStore("photos").get(k); rq.onsuccess=function(){res(rq.result||null);}; rq.onerror=function(){res(null);}; }); }).catch(function(){return null;}); }
+  function idbDel(k){ return idb().then(function(db){ return new Promise(function(res){ var tx=db.transaction("photos","readwrite"); tx.objectStore("photos").delete(k); tx.oncomplete=function(){res();}; tx.onerror=function(){res();}; }); }).catch(function(){}); }
+
+  // Shrink to <=1MB only when needed; leave smaller images untouched.
+  function compressImage(file){
+    var LIMIT=1024*1024;
+    return new Promise(function(resolve,reject){
+      if(file.size<=LIMIT){ resolve(file); return; }
+      var img=new Image(), url=URL.createObjectURL(file);
+      img.onload=function(){
+        URL.revokeObjectURL(url);
+        var sc=Math.min(1,1600/Math.max(img.width,img.height));
+        var w=Math.round(img.width*sc), h=Math.round(img.height*sc);
+        var cv=document.createElement("canvas"), ctx=cv.getContext("2d"), quality=0.9;
+        function step(){
+          cv.width=w; cv.height=h; ctx.clearRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+          cv.toBlob(function(b){
+            if(!b){ resolve(file); return; }
+            if(b.size<=LIMIT){ resolve(b); return; }
+            if(quality>0.45){ quality-=0.12; step(); return; }
+            if(Math.max(w,h)>700){ w=Math.round(w*0.82); h=Math.round(h*0.82); quality=0.85; step(); return; }
+            resolve(b); // best effort
+          },"image/jpeg",quality);
+        }
+        step();
+      };
+      img.onerror=function(){ URL.revokeObjectURL(url); reject("Could not read image"); };
+      img.src=url;
+    });
+  }
+  function stStorage(path,opts){ return ensureToken().then(function(){
+    var h=Object.assign({apikey:SB_KEY,Authorization:"Bearer "+auth.access_token},opts.headers||{});
+    return fetch(SB_URL+"/storage/v1/"+path,{method:opts.method||"GET",headers:h,body:opts.body});
+  }); }
+  function uploadPhoto(path,blob){ return stStorage("object/"+BUCKET+"/"+path,{method:"POST",
+    headers:{"x-upsert":"true","Content-Type":blob.type||"image/jpeg"},body:blob}).then(function(r){return r.ok;}).catch(function(){return false;}); }
+  function signUrl(path){
+    var c=_signCache[path]; if(c&&c.exp>Date.now())return Promise.resolve(c.url);
+    return stStorage("object/sign/"+BUCKET+"/"+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({expiresIn:3600})})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(j){ if(j&&j.signedURL){ var u=SB_URL+"/storage/v1"+j.signedURL; _signCache[path]={url:u,exp:Date.now()+55*60000}; return u;} return null; })
+      .catch(function(){return null;});
+  }
+  function deletePhotoObj(path){ return stStorage("object/"+BUCKET+"/"+path,{method:"DELETE"}).catch(function(){}); }
+
+  function attachPhoto(task,file){
+    if(!signedIn()){ openCloud(); return; }
+    if(!/^image\//.test(file.type||"")){ setPhotoMsg("Please choose an image file."); return; }
+    setPhotoMsg("Processing…");
+    compressImage(file).then(function(blob){
+      var oldPath=task.photo&&task.photo.path;
+      var path=auth.user_id+"/"+task.id+"-"+uid()+".jpg";
+      return idbPut(path,blob).then(function(){
+        task.photo={path:path,name:file.name,size:blob.size,type:blob.type||"image/jpeg",pending:true};
+        save(); renderPhotoSection(task); renderTable();
+        return uploadPhoto(path,blob).then(function(ok){
+          task.photo.pending=!ok; save(); renderPhotoSection(task);
+          setPhotoMsg(ok?"":"Saved on this device — will upload when back online.");
+          if(oldPath&&oldPath!==path){ idbDel(oldPath); deletePhotoObj(oldPath); }
+        });
+      });
+    }).catch(function(){ setPhotoMsg("Couldn't process that image."); });
+  }
+  function removePhoto(task){
+    var p=task.photo&&task.photo.path; task.photo=null; save(); renderPhotoSection(task); renderTable();
+    if(p){ idbDel(p); deletePhotoObj(p); }
+  }
+  function uploadPending(){
+    if(!signedIn())return;
+    state.projects.forEach(function(pr){ (pr.tasks||[]).forEach(function(t){
+      if(t.photo&&t.photo.pending){ idbGet(t.photo.path).then(function(b){ if(b)uploadPhoto(t.photo.path,b).then(function(ok){ if(ok){t.photo.pending=false; persist();} }); }); }
+    }); });
+  }
+  function displayPhoto(path,img){
+    idbGet(path).then(function(b){
+      if(b){ img.src=URL.createObjectURL(b); return; }
+      if(signedIn()) signUrl(path).then(function(u){ if(u){ img.src=u; fetch(u).then(function(r){return r.blob();}).then(function(bl){idbPut(path,bl);}).catch(function(){}); } });
+    });
+  }
+
+  /* ================= Cloud + photo UI ================= */
+  function openCloud(){ $("#cloudScrim").classList.add("open"); $("#cloudModal").classList.add("open"); $("#cloudModal").setAttribute("aria-hidden","false"); renderCloudModal(); }
+  function closeCloud(){ $("#cloudScrim").classList.remove("open"); $("#cloudModal").classList.remove("open"); $("#cloudModal").setAttribute("aria-hidden","true"); }
+  function updateCloudUI(){ var b=$("#cloudBtn"); if(b)b.classList.toggle("on",signedIn()); }
+  function setSyncStatus(m){ var e=$("#cloudStatus"); if(e)e.textContent=m; }
+  function timeAgo(t){ var s=Math.round((Date.now()-t)/1000); if(s<60)return s+"s ago"; if(s<3600)return Math.round(s/60)+"m ago"; return Math.round(s/3600)+"h ago"; }
+  function updateSyncStatus(){ updateCloudUI(); setSyncStatus(lastSync?("Last synced "+timeAgo(lastSync)):"Waiting to sync…"); }
+  function onSignedIn(){ updateCloudUI(); renderCloudModal(); startSync(); if(editingId){var t=taskById(editingId); if(t)renderPhotoSection(t);} }
+  function renderCloudModal(){
+    var b=$("#cloudBody"); if(!b)return;
+    if(signedIn()){
+      b.innerHTML='<p class="cloud-note">Signed in as <b>'+esc(auth.email||"")+'</b>. Sync is on — changes upload automatically and pull every 25 seconds across your devices.</p>'+
+        '<div class="cloud-status" id="cloudStatus"></div>'+
+        '<div class="cloud-actions"><button class="btn" id="cSyncNow">Sync now</button><button class="btn del" id="cSignout">Sign out</button></div>';
+      updateSyncStatus();
+      $("#cSyncNow").onclick=function(){ setSyncStatus("Syncing…"); syncPull().then(function(){return pushRemote();}).then(function(){lastSync=Date.now();updateSyncStatus();}).catch(function(){setSyncStatus("Sync failed — check connection.");}); };
+      $("#cSignout").onclick=function(){ if(confirm("Sign out? Your data stays on this device."))signOut(); };
+    }else{
+      b.innerHTML='<p class="cloud-note">Sign in to sync your projects and task photos across devices. Your data is private — protected by row-level security.</p>'+
+        '<div class="field"><label for="cEmail">Email</label><input id="cEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>'+
+        '<div class="field"><label for="cPass">Password</label><input id="cPass" type="password" autocomplete="current-password" placeholder="At least 6 characters"></div>'+
+        '<div class="cloud-msg" id="cMsg"></div>'+
+        '<div class="cloud-actions"><button class="btn primary" id="cSignin">Sign in</button><button class="btn" id="cSignup">Create account</button></div>';
+      var go=function(create){
+        var em=($("#cEmail").value||"").trim(), pw=$("#cPass").value||"";
+        if(!em||!pw){ $("#cMsg").textContent="Enter email and password."; return; }
+        $("#cMsg").textContent=create?"Creating account…":"Signing in…";
+        doSignIn(em,pw,create).then(function(res){
+          if(res==="in"){ $("#cMsg").textContent=""; onSignedIn(); }
+          else{ $("#cMsg").textContent="Account created — check your email to confirm, then Sign in."; }
+        }).catch(function(err){ $("#cMsg").textContent=String(err); });
+      };
+      $("#cSignin").onclick=function(){go(false);};
+      $("#cSignup").onclick=function(){go(true);};
+    }
+  }
+  function setPhotoMsg(m){ var e=$("#photoMsg"); if(e)e.textContent=m; }
+  function fmtSize(n){ if(!n)return ""; return n>=1048576?(n/1048576).toFixed(1)+" MB":Math.round(n/1024)+" KB"; }
+  function renderPhotoSection(task){
+    var box=$("#photoBox"); if(!box)return;
+    if(!signedIn()){
+      box.innerHTML='<div class="photo-empty"><button class="btn sm" id="photoSignin">Sign in to attach a photo</button></div><span class="autonote">Photos sync via your account so your subordinate can see them.</span>';
+      $("#photoSignin").onclick=openCloud; return;
+    }
+    if(task.photo&&task.photo.path){
+      box.innerHTML='<div class="photo-has"><img id="photoThumb" alt="task photo"><div class="photo-meta"><div class="nm">'+esc(task.photo.name||"photo")+'</div>'+
+        '<div class="sz">'+fmtSize(task.photo.size)+(task.photo.pending?' · <span class="pend">not uploaded yet</span>':' · uploaded')+'</div>'+
+        '<div class="photo-acts"><button class="btn sm" id="photoReplace">Replace</button><button class="btn sm" id="photoOpen">Open</button><button class="btn sm del" id="photoRemove">Remove</button></div></div></div>'+
+        '<div class="cloud-msg" id="photoMsg"></div>';
+      var img=$("#photoThumb"); displayPhoto(task.photo.path,img);
+      img.onclick=function(){ if(img.src)window.open(img.src,"_blank"); };
+      $("#photoReplace").onclick=function(){ $("#fPhoto").click(); };
+      $("#photoOpen").onclick=function(){ if(img.src)window.open(img.src,"_blank"); };
+      $("#photoRemove").onclick=function(){ if(confirm("Remove this photo?"))removePhoto(task); };
+    }else{
+      box.innerHTML='<div class="photo-empty"><button class="btn sm" id="photoAdd">+ Add photo</button><span class="autonote">Large photos shrink to ≤1MB automatically.</span></div><div class="cloud-msg" id="photoMsg"></div>';
+      $("#photoAdd").onclick=function(){ $("#fPhoto").click(); };
+    }
+  }
 
   /* ---------------- Date helpers ---------------- */
   var DAY=86400000;
@@ -564,7 +880,9 @@
         '<td class="wbs">'+row.wbs+'</td>'+
         '<td><div class="taskname" style="padding-left:'+indent+'px">'+chev+
           '<span class="dot" style="background:var('+st.c+')"></span>'+
-          '<span class="name" title="'+esc(t.name)+'">'+esc(t.name||"(untitled)")+'</span></div></td>'+
+          '<span class="name" title="'+esc(t.name)+'">'+esc(t.name||"(untitled)")+'</span>'+
+          (t.photo?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
+          '</div></td>'+
         '<td>'+esc(t.pic||"—")+'</td>'+
         '<td>'+(t.priority?'<span class="prio '+t.priority+'">'+t.priority+'</span>':"—")+'</td>'+
         '<td><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span></td>'+
@@ -752,8 +1070,9 @@
     renderKpis();
     if(view==="table"){ $("#tableView").style.display=""; $("#ganttView").style.display="none"; renderTable(); }
     else{ $("#tableView").style.display="none"; $("#ganttView").style.display=""; renderGantt(); }
-    save();
+    persist();
   }
+  function refreshAll(){ renderProjSelect(); render(); }
 
   /* ---------------- Drawer ---------------- */
   function openDrawer(id){
@@ -771,6 +1090,7 @@
     // parent: dates & pct auto
     ["#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE"].forEach(function(sel){ $(sel).disabled=kids; });
     $("#autoNote").style.display=kids?"":"none";
+    renderPhotoSection(t);
     $("#scrim").classList.add("open"); $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
     setTimeout(function(){$("#fName").focus();},60);
     if(view==="table")renderTable();
@@ -807,6 +1127,7 @@
   }
   function deleteTask(id){
     var ids=[id]; (function collect(pid){ children(pid).forEach(function(c){ids.push(c.id);collect(c.id);}); })(id);
+    ids.forEach(function(tid){ var tk=taskById(tid); if(tk&&tk.photo&&tk.photo.path){ idbDel(tk.photo.path); deletePhotoObj(tk.photo.path); } });
     activeProject().tasks=tasks().filter(function(t){return ids.indexOf(t.id)<0;});
     save();
   }
@@ -970,15 +1291,31 @@
 
     // re-render gantt colors when OS theme flips (only if user hasn't pinned)
     if(window.matchMedia){ window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(){ if(view==="gantt")renderGantt(); }); }
+
+    // cloud sync
+    $("#cloudBtn").addEventListener("click",openCloud);
+    $("#cloudClose").addEventListener("click",closeCloud);
+    $("#cloudScrim").addEventListener("click",closeCloud);
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("#cloudModal").classList.contains("open"))closeCloud(); });
+
+    // photo picker
+    $("#fPhoto").addEventListener("change",function(e){ var f=e.target.files[0]; if(f&&editingId){ var t=taskById(editingId); if(t)attachPhoto(t,f); } e.target.value=""; });
+
+    // pull latest when the app returns to the foreground; retry uploads when back online
+    document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&signedIn()){ syncPull(); uploadPending(); } });
+    window.addEventListener("online",function(){ if(signedIn()){ uploadPending(); syncPull(); } });
   }
 
   /* ---------------- Init ---------------- */
   state=load();
   activeProject();
+  loadAuth();
   applyTheme(currentTheme());
   $("#verTag").textContent=VERSION;
   renderProjSelect();
   bind();
   render();
+  updateCloudUI();
+  if(signedIn()) startSync();
 })();
 </script>
