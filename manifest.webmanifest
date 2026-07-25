@@ -1,0 +1,17 @@
+{
+  "name": "Project Tracker — Tasks, PIC & Gantt",
+  "short_name": "Tracker",
+  "description": "Multi-project task tracker with baseline/planned/actual dates and a printable Gantt chart.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1521",
+  "theme_color": "#1d6fa5",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "./icon.svg", "type": "image/svg+xml" }
+  ]
+}

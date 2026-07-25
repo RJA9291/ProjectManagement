@@ -1,0 +1,2 @@
+# Keep shell scripts LF so the bash auto-push hook runs after a re-clone on any OS.
+*.sh text eol=lf
