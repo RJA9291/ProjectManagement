@@ -234,6 +234,22 @@
   .photo-meta .pend{color:var(--s-onhold)}
   .photo-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
   .photo-ind{display:inline-flex;align-items:center;color:var(--accent);flex:none}
+  .rolelabel{font-size:12px;color:var(--text-dim);font-weight:560;white-space:nowrap}
+  .section-head{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);margin:4px 0 2px;padding-top:12px;border-top:1px dashed var(--border)}
+  .fieldhint{font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-faint);font-size:11px}
+  .mine-tag{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-weak);padding:1px 5px;border-radius:4px;flex:none}
+  input:disabled,select:disabled,textarea:disabled{opacity:.6;cursor:not-allowed;background:var(--surface-2)}
+  .gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+  .gate-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:22px;display:flex;flex-direction:column;gap:12px}
+  .gate-card h2{margin:0;font-size:20px;letter-spacing:-.3px}
+  .gate-card p{margin:0;font-size:13.5px;color:var(--text-dim);line-height:1.5}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--surface);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:520;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:70;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .team-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .team-row .who{min-width:0;flex:1}
+  .team-row .who .nm{font-weight:560;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-row .who .em{font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-me{font-size:11px;color:var(--accent);font-weight:600}
 
   /* ---------- Print ---------- */
   @media print{
@@ -269,7 +285,11 @@
       </button>
     </div>
 
-    <button class="btn icon" id="cloudBtn" title="Cloud sync / sign in">
+    <span id="roleLabel" class="rolelabel"></span>
+    <button class="btn icon" id="teamBtn" title="Team &amp; roles" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </button>
+    <button class="btn icon" id="cloudBtn" title="Account / sync">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.98A6 6 0 0 0 6.3 9.5 4 4 0 0 0 6.5 17.5"/><path d="M9.5 13.5 12 11l2.5 2.5M12 11v7"/></svg>
     </button>
     <button class="btn icon" id="themeBtn" title="Toggle light / dark">
@@ -289,8 +309,9 @@
     </div>
     <div class="search" id="searchWrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="search" type="search" placeholder="Filter task or PIC…" autocomplete="off">
+      <input id="search" type="search" placeholder="Filter task or person…" autocomplete="off">
     </div>
+    <label class="switch" id="mineWrap" style="display:none"><input type="checkbox" id="mineToggle"> My tasks only</label>
     <div class="grow"></div>
     <button class="btn primary" id="addTask">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -357,9 +378,9 @@
   </div>
 
   <div class="foot">
-    <span id="verTag">v1</span>
+    <span id="verTag">v3</span>
     <span>·</span>
-    <span>Data saved on this device (localStorage). Use the backup button to export JSON before switching devices.</span>
+    <span>Shared team workspace — tasks &amp; photos sync live for everyone. Manager assigns; technicians complete.</span>
   </div>
 </div>
 
@@ -373,25 +394,15 @@
   <div class="body">
     <div class="field">
       <label for="fName">Task name / Nama tugas</label>
-      <input id="fName" type="text" placeholder="e.g. Draft requirements">
+      <input id="fName" type="text" placeholder="e.g. Replace bearing on line 3">
     </div>
     <div class="row2">
-      <div class="field"><label for="fPic">PIC / Bertugas</label><input id="fPic" type="text" placeholder="Name / Nama"></div>
+      <div class="field"><label for="fAssignee">Assign to / Diberi kepada</label>
+        <select id="fAssignee"></select>
+      </div>
       <div class="field"><label for="fPrio">Priority / Keutamaan</label>
         <select id="fPrio"><option>High</option><option selected>Medium</option><option>Low</option></select>
       </div>
-    </div>
-    <div class="row2">
-      <div class="field"><label for="fStatus">Status</label>
-        <select id="fStatus">
-          <option value="not_started">Not Started / Belum Mula</option>
-          <option value="in_progress">In Progress / Sedang Jalan</option>
-          <option value="completed">Completed / Selesai</option>
-          <option value="on_hold">On Hold / Tangguh</option>
-          <option value="blocked">Blocked / Tersekat</option>
-        </select>
-      </div>
-      <div class="field"><label for="fPct">% Complete</label><input id="fPct" type="number" min="0" max="100" step="5" value="0"></div>
     </div>
 
     <div class="datepair">
@@ -408,6 +419,28 @@
         <div class="field"><label for="fPlanE">End</label><input id="fPlanE" type="date"></div>
       </div>
     </div>
+
+    <div class="field"><label for="fDep">Dependency / Kebergantungan</label><input id="fDep" type="text" placeholder="e.g. 1.2 (WBS of predecessor)"></div>
+    <div class="field"><label for="fRemark">Instructions / Remarks · Arahan</label><textarea id="fRemark" placeholder="What to do, acceptance criteria, notes…"></textarea></div>
+    <div class="field">
+      <label>Instruction photo / Gambar arahan <span class="fieldhint">(manager)</span></label>
+      <div id="instructionPhotoBox" class="photobox"></div>
+    </div>
+    <p class="autonote" id="autoNote" style="display:none">This is a parent task — dates &amp; % roll up automatically from its sub-tasks.</p>
+
+    <div class="section-head">Completion / Penyelesaian <span class="fieldhint">(technician)</span></div>
+    <div class="row2">
+      <div class="field"><label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option value="not_started">Not Started / Belum Mula</option>
+          <option value="in_progress">In Progress / Sedang Jalan</option>
+          <option value="completed">Completed / Selesai</option>
+          <option value="on_hold">On Hold / Tangguh</option>
+          <option value="blocked">Blocked / Tersekat</option>
+        </select>
+      </div>
+      <div class="field"><label for="fPct">% Complete</label><input id="fPct" type="number" min="0" max="100" step="5" value="0"></div>
+    </div>
     <div class="datepair">
       <div class="h"><span class="tag" style="background:var(--s-inprogress)"></span>Actual / Sebenar</div>
       <div class="row2">
@@ -415,16 +448,15 @@
         <div class="field"><label for="fActE">End</label><input id="fActE" type="date"></div>
       </div>
     </div>
-    <p class="autonote" id="autoNote" style="display:none">This is a parent task — dates &amp; % roll up automatically from its sub-tasks.</p>
-
-    <div class="field"><label for="fDep">Dependency / Kebergantungan</label><input id="fDep" type="text" placeholder="e.g. 1.2 (WBS of predecessor)"></div>
-    <div class="field"><label for="fRemark">Remarks / Catatan</label><textarea id="fRemark" placeholder="Notes, blockers, acceptance criteria…"></textarea></div>
-
+    <div class="field"><label for="fTool">Items from tool crib (for replacement) / Barang tool crib</label><textarea id="fTool" placeholder="e.g. 2× SKF 6204 bearing, 1× drive belt A-42"></textarea></div>
+    <div class="field"><label for="fClose">Date closed / Tarikh tutup</label><input id="fClose" type="date"></div>
+    <div class="field"><label for="fReason">If still in progress — why / Sebab belum siap</label><textarea id="fReason" placeholder="e.g. waiting for spare part, ETA 2 days"></textarea></div>
+    <div class="field"><label for="fTech">Completion remarks / Catatan penyelesaian</label><textarea id="fTech" placeholder="What was done"></textarea></div>
     <div class="field">
-      <label>Task photo / Gambar tugas</label>
-      <div id="photoBox" class="photobox"></div>
-      <input type="file" id="fPhoto" accept="image/*" style="display:none">
+      <label>Completion photo / Gambar siap <span class="fieldhint">(technician)</span></label>
+      <div id="completionPhotoBox" class="photobox"></div>
     </div>
+    <input type="file" id="fPhoto" accept="image/*" style="display:none">
   </div>
   <footer>
     <button class="btn" id="addSub">+ Sub-task</button>
@@ -444,12 +476,27 @@
   <div class="body" id="cloudBody"></div>
 </aside>
 
+<!-- Team & roles modal (manager) -->
+<div class="modal-scrim" id="teamScrim"></div>
+<aside class="modal" id="teamModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <header>
+    <span class="t">Team &amp; roles</span>
+    <button class="btn icon" id="teamClose" title="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </header>
+  <div class="body" id="teamBody"></div>
+</aside>
+
+<!-- Sign-in / access gate -->
+<div class="gate" id="gate" style="display:none"><div class="gate-card" id="gateBody"></div></div>
+
+<div class="toast" id="toast"></div>
+
 <input type="file" id="importFile" accept="application/json" style="display:none">
 
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v1", VERSION="v2";
+  var LS_KEY="pm_tracker_v3", VERSION="v3";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -471,55 +518,59 @@
   ];
   var STATUS_MAP={}; STATUS.forEach(function(s){STATUS_MAP[s.v]=s;});
 
-  var state=null;      // whole store
-  var view="table";    // table | gantt
+  var state={projects:[],activeProjectId:""};   // shared, DB-backed
+  var profiles=[];      // all team members
+  var me=null;          // {id,email,name,role}
+  var view="table";     // table | gantt
   var ganttScale="week";
   var showBaseline=true, showDeps=true;
   var filter="";
+  var myTasksOnly=false;
   var editingId=null;
+  var loadedOnce=false;
+  function isManager(){ return !!(me && me.role==="manager"); }
+  function myRole(){ return me?me.role:"unassigned"; }
+  function profileName(id){ var p=profiles.filter(function(x){return x.id===id;})[0]; return p?(p.name||p.email):""; }
+  function collapsedSet(){ try{return JSON.parse(localStorage.getItem("pm_collapsed_v3")||"{}");}catch(e){return {};} }
+  function setCollapsed(id,val){ var c=collapsedSet(); if(val)c[id]=1; else delete c[id]; try{localStorage.setItem("pm_collapsed_v3",JSON.stringify(c));}catch(e){} }
 
-  function seed(){
-    var t=function(o){o.id=uid();return o;};
-    var mk=function(name,pic,prio,status,pct,bs,be,ps,pe,as,ae,dep,rem,parent){
-      return t({name:name,pic:pic,priority:prio,status:status,percent:pct,
-        baseStart:bs,baseEnd:be,planStart:ps,planEnd:pe,actStart:as,actEnd:ae,
-        dependency:dep||"",remarks:rem||"",parentId:parent||null,collapsed:false});
-    };
-    var p1=mk("Requirements & scoping","Aisyah","High","completed",100,"2026-07-01","2026-07-08","2026-07-01","2026-07-09","2026-07-01","2026-07-10","","Signed off by sponsor",null);
-    var p1a=mk("Stakeholder interviews","Aisyah","Medium","completed",100,"2026-07-01","2026-07-04","2026-07-01","2026-07-04","2026-07-01","2026-07-05","","",p1.id);
-    var p1b=mk("Draft scope document","Bala","High","completed",100,"2026-07-05","2026-07-08","2026-07-05","2026-07-09","2026-07-06","2026-07-10","1.1","",p1.id);
-    var p2=mk("Design & build","Chong","High","in_progress",45,"2026-07-11","2026-07-31","2026-07-11","2026-08-04","2026-07-12","","1","On track, minor slip",null);
-    var p2a=mk("System design","Chong","High","completed",100,"2026-07-11","2026-07-17","2026-07-11","2026-07-18","2026-07-12","2026-07-19","","",p2.id);
-    var p2b=mk("Core development","Devi","High","in_progress",40,"2026-07-18","2026-07-28","2026-07-18","2026-08-01","2026-07-20","","2.1","Waiting on API",p2.id);
-    var p2c=mk("Integration & QA","Farid","Medium","not_started",0,"2026-07-27","2026-07-31","2026-07-29","2026-08-04","","","2.2","",p2.id);
-    var p3=mk("Launch & handover","Aisyah","Medium","not_started",0,"2026-08-01","2026-08-08","2026-08-05","2026-08-12","","","2","Depends on QA sign-off",null);
-    return {version:1,activeProjectId:"",projects:[
-      {id:uid(),name:"Sample Project / Projek Contoh",tasks:[p1,p1a,p1b,p2,p2a,p2b,p2c,p3]}
-    ]};
-  }
-
-  function load(){
-    try{
-      var raw=localStorage.getItem(LS_KEY);
-      if(raw){var s=JSON.parse(raw); if(s&&s.projects&&s.projects.length){return s;}}
-    }catch(e){}
-    return seed();
-  }
-  function persist(){ try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){} }
-  // save() = a user-initiated change: stamp updatedAt, persist locally, and queue a cloud push.
-  function save(){ state.updatedAt=nowISO(); persist(); schedulePush(); }
   function nowISO(){ return new Date().toISOString(); }
+  function persist(){ try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){} }
+  function save(){ persist(); }   // local cache only; DB writes happen per-row (upsertTask/…)
+  function loadCache(){ try{var s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.projects)state=s;}catch(e){} }
 
   function activeProject(){
+    if(!state.projects.length)return {id:"",name:"",tasks:[]};
     var p=state.projects.filter(function(x){return x.id===state.activeProjectId;})[0];
     if(!p){p=state.projects[0]; state.activeProjectId=p.id;}
     return p;
   }
-  function tasks(){return activeProject().tasks;}
-  function taskById(id){return tasks().filter(function(t){return t.id===id;})[0];}
+  function tasks(){return activeProject().tasks||[];}
+  function taskById(id){ var f; state.projects.forEach(function(p){(p.tasks||[]).forEach(function(t){if(t.id===id)f=t;});}); return f; }
   function children(id){return tasks().filter(function(t){return t.parentId===id;});}
   function roots(){return tasks().filter(function(t){return !t.parentId;});}
   function hasChildren(id){return children(id).length>0;}
+
+  // ---- row <-> task mappers (DB snake_case <-> app camelCase) ----
+  var uuid=function(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():(uid()+uid()+"-"+Date.now()); };
+  function rowToTask(r){
+    return {id:r.id, projectId:r.project_id, parentId:r.parent_id||null, position:r.position||0,
+      name:r.name||"", priority:r.priority||"Medium", status:r.status||"not_started", percent:r.percent||0,
+      baseStart:r.base_start||"", baseEnd:r.base_end||"", planStart:r.plan_start||"", planEnd:r.plan_end||"",
+      actStart:r.act_start||"", actEnd:r.act_end||"", dependency:r.dependency||"", remarks:r.remarks||"",
+      assignee:r.assignee||"", instructionPhoto:r.instruction_photo||"", completionPhoto:r.completion_photo||"",
+      toolCribItems:r.tool_crib_items||"", closeDate:r.close_date||"", techRemarks:r.tech_remarks||"",
+      inProgressReason:r.in_progress_reason||"", collapsed:!!collapsedSet()[r.id]};
+  }
+  function taskToRow(t){
+    return {id:t.id, project_id:t.projectId, parent_id:t.parentId||null, position:t.position||0,
+      name:t.name||"", priority:t.priority||"Medium", status:t.status||"not_started", percent:clamp(+t.percent||0),
+      base_start:t.baseStart||null, base_end:t.baseEnd||null, plan_start:t.planStart||null, plan_end:t.planEnd||null,
+      act_start:t.actStart||null, act_end:t.actEnd||null, dependency:t.dependency||"", remarks:t.remarks||"",
+      assignee:t.assignee||null, instruction_photo:t.instructionPhoto||null, completion_photo:t.completionPhoto||null,
+      tool_crib_items:t.toolCribItems||"", close_date:t.closeDate||null, tech_remarks:t.techRemarks||"",
+      in_progress_reason:t.inProgressReason||"", updated_at:nowISO()};
+  }
 
   /* ================= Cloud sync (Supabase REST) ================= */
   function loadAuth(){ try{var r=localStorage.getItem(AUTH_KEY); if(r)auth=JSON.parse(r);}catch(e){} }
@@ -561,72 +612,62 @@
     });
   }
   function signOut(){
-    stopSync(); auth=null; saveAuth();
-    try{localStorage.removeItem(MERGE_KEY);}catch(e){}
-    updateCloudUI(); renderCloudModal();
-    if(editingId){var t=taskById(editingId); if(t)renderPhotoSection(t);}
+    stopSync(); auth=null; me=null; profiles=[]; saveAuth();
+    state={projects:[],activeProjectId:""}; persist();
+    updateCloudUI(); renderCloudModal(); applyGate();
   }
 
-  function pullRemote(){
-    return sbRest("user_state?user_id=eq."+encodeURIComponent(auth.user_id)+"&select=data,updated_at")
-      .then(function(r){return r.json();})
-      .then(function(rows){ return (rows&&rows.length)?rows[0]:null; });
-  }
-  function pushRemote(){
-    var body=JSON.stringify({user_id:auth.user_id,data:state,updated_at:state.updatedAt||nowISO()});
-    return sbRest("user_state?on_conflict=user_id",{method:"POST",
-      headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:body});
-  }
-  // First sign-in on a device: fold remote data into local by id so nothing is clobbered.
-  function mergeStates(remote){
-    if(!remote||!remote.projects)return;
-    var byId={}; state.projects.forEach(function(p){byId[p.id]=p;});
-    remote.projects.forEach(function(rp){
-      var lp=byId[rp.id];
-      if(!lp){ state.projects.push(rp); }
-      else{ var seen={}; lp.tasks.forEach(function(x){seen[x.id]=1;});
-        (rp.tasks||[]).forEach(function(rt){ if(!seen[rt.id])lp.tasks.push(rt); }); }
+  // ---- pull all shared data (profiles + projects + tasks) into memory ----
+  function pullAll(){
+    if(!signedIn())return Promise.resolve();
+    return Promise.all([
+      sbRest("profiles?select=id,email,name,role").then(function(r){return r.ok?r.json():[];}),
+      sbRest("projects?select=*&order=position").then(function(r){return r.ok?r.json():[];}),
+      sbRest("tasks?select=*&order=position").then(function(r){return r.ok?r.json():[];})
+    ]).then(function(res){
+      profiles=Array.isArray(res[0])?res[0]:[];
+      me=profiles.filter(function(p){return p.id===auth.user_id;})[0]||me;
+      var prj=Array.isArray(res[1])?res[1]:[], tks=Array.isArray(res[2])?res[2]:[];
+      var byProj={}; prj.forEach(function(p){ byProj[p.id]={id:p.id,name:p.name,position:p.position,tasks:[]}; });
+      tks.forEach(function(r){ if(byProj[r.project_id]) byProj[r.project_id].tasks.push(rowToTask(r)); });
+      state.projects=prj.map(function(p){return byProj[p.id];});
+      if(!state.projects.some(function(p){return p.id===state.activeProjectId;}))
+        state.activeProjectId=state.projects[0]?state.projects[0].id:"";
+      loadedOnce=true; persist(); lastSync=Date.now(); updateSyncStatus();
+      if(editingId && !taskById(editingId)) closeDrawer();
     });
   }
-  function adoptRemote(remote){
-    state=remote.data; state.updatedAt=remote.updated_at;
-    if(!state.projects.some(function(p){return p.id===state.activeProjectId;}))
-      state.activeProjectId=state.projects[0]?state.projects[0].id:"";
-    persist(); refreshAll();
-    if(editingId && !taskById(editingId)) closeDrawer();
-  }
-  function syncPull(){
+  // ---- per-row DB writes (RLS decides who may write) ----
+  function upsertTask(t){
     if(!signedIn())return Promise.resolve();
-    return pullRemote().then(function(remote){
-      if(remote && remote.updated_at && (!state.updatedAt || remote.updated_at>state.updatedAt)) adoptRemote(remote);
-      lastSync=Date.now(); updateSyncStatus();
-    }).catch(function(){});
+    return sbRest("tasks?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(taskToRow(t))})
+      .then(function(r){ if(!r.ok){ r.text().then(function(x){ toast("Couldn't save — "+shortErr(x)); }); } });
   }
-  function schedulePush(){
-    if(!signedIn())return;
-    clearTimeout(pushTimer);
-    pushTimer=setTimeout(function(){ pushRemote().then(function(){lastSync=Date.now();updateSyncStatus();}).catch(function(){}); },1500);
+  function deleteTaskRows(ids){
+    if(!signedIn()||!ids.length)return Promise.resolve();
+    return sbRest("tasks?id=in.("+ids.join(",")+")",{method:"DELETE",headers:{Prefer:"return=minimal"}});
   }
+  function upsertProject(p){
+    if(!signedIn())return Promise.resolve();
+    return sbRest("projects?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:p.id,name:p.name,position:p.position||0})});
+  }
+  function deleteProjectRow(id){ if(!signedIn())return Promise.resolve(); return sbRest("projects?id=eq."+id,{method:"DELETE",headers:{Prefer:"return=minimal"}}); }
+  function updateProfileRole(id,role){ return sbRest("profiles?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({role:role})}); }
+  function shortErr(x){ try{var j=JSON.parse(x); return (j.message||j.hint||x).slice(0,120);}catch(e){return (x||"").slice(0,120);} }
+
+  function syncPull(){ if(!signedIn())return Promise.resolve(); return pullAll().then(function(){ refreshAll(); }).catch(function(){}); }
+  function schedulePush(){}   // writes are per-row now; nothing to debounce
   function startSync(){
     if(!signedIn())return;
     clearInterval(pollTimer);
-    var mergedFor=null; try{mergedFor=localStorage.getItem(MERGE_KEY);}catch(e){}
-    var first=(mergedFor!==auth.user_id);
-    pullRemote().then(function(remote){
-      if(first){
-        if(remote&&remote.data)mergeStates(remote.data);
-        state.updatedAt=nowISO(); persist(); refreshAll();
-        try{localStorage.setItem(MERGE_KEY,auth.user_id);}catch(e){}
-        return pushRemote();
-      }else if(remote && remote.updated_at && (!state.updatedAt || remote.updated_at>state.updatedAt)){
-        adoptRemote(remote);
-      }else{
-        return pushRemote();
-      }
-    }).then(function(){ lastSync=Date.now(); updateSyncStatus(); uploadPending(); }).catch(function(){ updateSyncStatus(); });
-    pollTimer=setInterval(syncPull,25000);
+    pullAll().then(function(){
+      if(isManager() && !state.projects.length){ var p={id:uuid(),name:"General",position:1,tasks:[]}; state.projects.push(p); state.activeProjectId=p.id; upsertProject(p); }
+      applyGate(); refreshAll(); uploadPending();
+    }).catch(function(){ applyGate(); });
+    pollTimer=setInterval(syncPull,15000);
   }
-  function stopSync(){ clearInterval(pollTimer); clearTimeout(pushTimer); }
+  function stopSync(){ clearInterval(pollTimer); }
+  function toast(m){ var e=$("#toast"); if(!e)return; e.textContent=m; e.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(function(){e.classList.remove("show");},4500); }
 
   /* ================= Photos (compress + IndexedDB cache + Storage) ================= */
   var _db=null, _signCache={};
@@ -684,35 +725,40 @@
   }
   function deletePhotoObj(path){ return stStorage("object/"+BUCKET+"/"+path,{method:"DELETE"}).catch(function(){}); }
 
-  function attachPhoto(task,file){
+  function canEditTask(t){ return isManager() || (me && t && t.assignee===me.id); }
+  function canEditInstruction(t){ return isManager(); }
+  function canEditCompletion(t){ return isManager() || (me && t && t.assignee===me.id); }
+  function photoPending(){ try{return JSON.parse(localStorage.getItem("pm_pending_photos")||"{}");}catch(e){return {};} }
+  function setPending(path,on){ var m=photoPending(); if(on)m[path]=1; else delete m[path]; try{localStorage.setItem("pm_pending_photos",JSON.stringify(m));}catch(e){} }
+
+  // slot = 'instruction' (manager) | 'completion' (assignee/manager)
+  function attachPhoto(task,slot,file){
     if(!signedIn()){ openCloud(); return; }
-    if(!/^image\//.test(file.type||"")){ setPhotoMsg("Please choose an image file."); return; }
-    setPhotoMsg("Processing…");
+    if(!/^image\//.test(file.type||"")){ setPhotoMsg(slot,"Please choose an image file."); return; }
+    setPhotoMsg(slot,"Processing…");
     compressImage(file).then(function(blob){
-      var oldPath=task.photo&&task.photo.path;
-      var path=auth.user_id+"/"+task.id+"-"+uid()+".jpg";
+      var field=slot+"Photo", oldPath=task[field];
+      var path=task.id+"/"+slot+"-"+uid()+".jpg";
       return idbPut(path,blob).then(function(){
-        task.photo={path:path,name:file.name,size:blob.size,type:blob.type||"image/jpeg",pending:true};
-        save(); renderPhotoSection(task); renderTable();
         return uploadPhoto(path,blob).then(function(ok){
-          task.photo.pending=!ok; save(); renderPhotoSection(task);
-          setPhotoMsg(ok?"":"Saved on this device — will upload when back online.");
-          if(oldPath&&oldPath!==path){ idbDel(oldPath); deletePhotoObj(oldPath); }
+          if(!ok){ setPending(path,1); setPhotoMsg(slot,"Saved on this device — will upload when back online."); }
+          else setPhotoMsg(slot,"");
+          task[field]=path; upsertTask(task); renderPhotoSection(task); renderTable();
+          if(oldPath&&oldPath!==path){ idbDel(oldPath); deletePhotoObj(oldPath); setPending(oldPath,0); }
         });
       });
-    }).catch(function(){ setPhotoMsg("Couldn't process that image."); });
+    }).catch(function(){ setPhotoMsg(slot,"Couldn't process that image."); });
   }
-  function removePhoto(task){
-    var p=task.photo&&task.photo.path; task.photo=null; save(); renderPhotoSection(task); renderTable();
-    if(p){ idbDel(p); deletePhotoObj(p); }
+  function removePhoto(task,slot){
+    var field=slot+"Photo", p=task[field]; task[field]=""; upsertTask(task); renderPhotoSection(task); renderTable();
+    if(p){ idbDel(p); deletePhotoObj(p); setPending(p,0); }
   }
   function uploadPending(){
-    if(!signedIn())return;
-    state.projects.forEach(function(pr){ (pr.tasks||[]).forEach(function(t){
-      if(t.photo&&t.photo.pending){ idbGet(t.photo.path).then(function(b){ if(b)uploadPhoto(t.photo.path,b).then(function(ok){ if(ok){t.photo.pending=false; persist();} }); }); }
-    }); });
+    if(!signedIn())return; var m=photoPending();
+    Object.keys(m).forEach(function(path){ idbGet(path).then(function(b){ if(b)uploadPhoto(path,b).then(function(ok){ if(ok)setPending(path,0); }); }); });
   }
   function displayPhoto(path,img){
+    if(!path)return;
     idbGet(path).then(function(b){
       if(b){ img.src=URL.createObjectURL(b); return; }
       if(signedIn()) signUrl(path).then(function(u){ if(u){ img.src=u; fetch(u).then(function(r){return r.blob();}).then(function(bl){idbPut(path,bl);}).catch(function(){}); } });
@@ -726,7 +772,87 @@
   function setSyncStatus(m){ var e=$("#cloudStatus"); if(e)e.textContent=m; }
   function timeAgo(t){ var s=Math.round((Date.now()-t)/1000); if(s<60)return s+"s ago"; if(s<3600)return Math.round(s/60)+"m ago"; return Math.round(s/3600)+"h ago"; }
   function updateSyncStatus(){ updateCloudUI(); setSyncStatus(lastSync?("Last synced "+timeAgo(lastSync)):"Waiting to sync…"); }
-  function onSignedIn(){ updateCloudUI(); renderCloudModal(); startSync(); if(editingId){var t=taskById(editingId); if(t)renderPhotoSection(t);} }
+  function onSignedIn(){ updateCloudUI(); renderCloudModal(); applyGate(); startSync(); }
+  // Show/hide the whole app depending on auth + role.
+  function applyGate(){
+    var gate=$("#gate"), appEl=$(".app");
+    if(!signedIn()){ gate.style.display="flex"; appEl.style.display="none"; $("#gateBody").innerHTML=gateSignInHTML(); wireGateSignIn(); return; }
+    if(!me){ gate.style.display="flex"; appEl.style.display="none"; $("#gateBody").innerHTML='<h2>Loading…</h2><p>Fetching your workspace.</p>'; return; }
+    if(myRole()==="unassigned"){
+      gate.style.display="flex"; appEl.style.display="none";
+      $("#gateBody").innerHTML='<h2>Waiting for access</h2><p>You\'re signed in as <b>'+esc(me?me.email:"")+'</b>, but a manager hasn\'t assigned your role yet. Ask your manager to add you as a Technician from the Team screen, then reload.</p><div class="cloud-actions"><button class="btn" id="gateReload">Reload</button><button class="btn del" id="gateOut">Sign out</button></div>';
+      $("#gateReload").onclick=function(){ pullAll().then(applyGate); };
+      $("#gateOut").onclick=signOut;
+      return;
+    }
+    gate.style.display="none"; appEl.style.display="";
+    applyRoleUI();
+  }
+  function gateSignInHTML(){
+    return '<h2>Project Tracker</h2><p>Sign in to your team workspace. The first person to sign up becomes the Manager.</p>'+
+      '<div class="field"><label for="gEmail">Email</label><input id="gEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>'+
+      '<div class="field"><label for="gPass">Password</label><input id="gPass" type="password" autocomplete="current-password" placeholder="At least 6 characters"></div>'+
+      '<div class="cloud-msg" id="gMsg"></div>'+
+      '<div class="cloud-actions"><button class="btn primary" id="gSignin">Sign in</button><button class="btn" id="gSignup">Create account</button></div>';
+  }
+  function wireGateSignIn(){
+    var go=function(create){
+      var em=($("#gEmail").value||"").trim(), pw=$("#gPass").value||"";
+      if(!em||!pw){ $("#gMsg").textContent="Enter email and password."; return; }
+      $("#gMsg").textContent=create?"Creating account…":"Signing in…";
+      doSignIn(em,pw,create).then(function(res){
+        if(res==="in"){ $("#gMsg").textContent=""; onSignedIn(); }
+        else $("#gMsg").textContent="Account created — check your email to confirm, then Sign in.";
+      }).catch(function(err){ $("#gMsg").textContent=String(err); });
+    };
+    $("#gSignin").onclick=function(){go(false);};
+    $("#gSignup").onclick=function(){go(true);};
+  }
+  // Hide manager-only controls for technicians.
+  function applyRoleUI(){
+    var mgr=isManager();
+    [".proj-select","#addTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; });
+    var teamBtn=$("#teamBtn"); if(teamBtn)teamBtn.style.display=mgr?"":"none";
+    var mineWrap=$("#mineWrap"); if(mineWrap)mineWrap.style.display=mgr?"none":"";
+    var rl=$("#roleLabel"); if(rl)rl.textContent=(me?(me.name||me.email):"")+" · "+(mgr?"Manager":"Technician");
+  }
+
+  /* ---------------- Team & roles (manager) ---------------- */
+  function openTeam(){ if(!isManager())return; $("#teamScrim").classList.add("open"); $("#teamModal").classList.add("open"); $("#teamModal").setAttribute("aria-hidden","false"); renderTeamModal(); }
+  function closeTeam(){ $("#teamScrim").classList.remove("open"); $("#teamModal").classList.remove("open"); $("#teamModal").setAttribute("aria-hidden","true"); }
+  function renderTeamModal(){
+    var b=$("#teamBody"); if(!b)return;
+    var rows=profiles.slice().sort(function(a,c){ return (a.name||a.email||"").localeCompare(c.name||c.email||""); });
+    var html='<p class="cloud-note">Set each member\'s role. Managers create &amp; assign tasks; technicians complete the tasks assigned to them. New sign-ups start as <b>Unassigned</b>.</p>';
+    rows.forEach(function(p){
+      var meTag=(me&&p.id===me.id)?' <span class="team-me">you</span>':'';
+      html+='<div class="team-row"><div class="who"><div class="nm">'+esc(p.name||p.email||"—")+meTag+'</div><div class="em">'+esc(p.email||"")+'</div></div>'+
+        '<select data-role-for="'+p.id+'">'+
+        '<option value="manager"'+(p.role==="manager"?" selected":"")+'>Manager</option>'+
+        '<option value="technician"'+(p.role==="technician"?" selected":"")+'>Technician</option>'+
+        '<option value="unassigned"'+(p.role==="unassigned"?" selected":"")+'>Unassigned</option>'+
+        '</select></div>';
+    });
+    if(!rows.length)html+='<p class="cloud-note">No members yet.</p>';
+    b.innerHTML=html;
+    [].forEach.call(b.querySelectorAll("[data-role-for]"),function(sel){
+      sel.addEventListener("change",function(){
+        var id=sel.getAttribute("data-role-for"), role=sel.value;
+        if(me&&id===me.id&&role!=="manager"){
+          var mgrs=profiles.filter(function(x){return x.role==="manager";}).length;
+          if(mgrs<=1){ toast("You're the only manager — promote someone else first."); sel.value="manager"; return; }
+        }
+        updateProfileRole(id,role).then(function(r){
+          if(r&&r.ok===false){ toast("Couldn't change role."); return; }
+          var p=profiles.filter(function(x){return x.id===id;})[0]; if(p)p.role=role;
+          if(me&&id===me.id)me.role=role;
+          renderTeamModal(); applyRoleUI(); renderTable();
+          if(editingId){var t=taskById(editingId); if(t)buildAssigneeOptions(t.assignee);}
+          toast("Role updated.");
+        }).catch(function(){ toast("Couldn't change role."); });
+      });
+    });
+  }
   function renderCloudModal(){
     var b=$("#cloudBody"); if(!b)return;
     if(signedIn()){
@@ -755,28 +881,28 @@
       $("#cSignup").onclick=function(){go(true);};
     }
   }
-  function setPhotoMsg(m){ var e=$("#photoMsg"); if(e)e.textContent=m; }
-  function fmtSize(n){ if(!n)return ""; return n>=1048576?(n/1048576).toFixed(1)+" MB":Math.round(n/1024)+" KB"; }
-  function renderPhotoSection(task){
-    var box=$("#photoBox"); if(!box)return;
-    if(!signedIn()){
-      box.innerHTML='<div class="photo-empty"><button class="btn sm" id="photoSignin">Sign in to attach a photo</button></div><span class="autonote">Photos sync via your account so your subordinate can see them.</span>';
-      $("#photoSignin").onclick=openCloud; return;
-    }
-    if(task.photo&&task.photo.path){
-      box.innerHTML='<div class="photo-has"><img id="photoThumb" alt="task photo"><div class="photo-meta"><div class="nm">'+esc(task.photo.name||"photo")+'</div>'+
-        '<div class="sz">'+fmtSize(task.photo.size)+(task.photo.pending?' · <span class="pend">not uploaded yet</span>':' · uploaded')+'</div>'+
-        '<div class="photo-acts"><button class="btn sm" id="photoReplace">Replace</button><button class="btn sm" id="photoOpen">Open</button><button class="btn sm del" id="photoRemove">Remove</button></div></div></div>'+
-        '<div class="cloud-msg" id="photoMsg"></div>';
-      var img=$("#photoThumb"); displayPhoto(task.photo.path,img);
+  function setPhotoMsg(slot,m){ var e=$("#"+slot+"Msg"); if(e)e.textContent=m; }
+  function photoBlock(slot,path,canEdit,label){
+    var box=$("#"+slot+"PhotoBox"); if(!box)return;
+    var thumbId=slot+"Thumb";
+    if(path){
+      box.innerHTML='<div class="photo-has"><img id="'+thumbId+'" alt="'+label+'"><div class="photo-meta"><div class="nm">'+label+'</div>'+
+        '<div class="photo-acts">'+(canEdit?'<button class="btn sm" data-pa="replace" data-slot="'+slot+'">Replace</button>':'')+
+        '<button class="btn sm" data-pa="open" data-slot="'+slot+'">Open</button>'+
+        (canEdit?'<button class="btn sm del" data-pa="remove" data-slot="'+slot+'">Remove</button>':'')+
+        '</div></div></div><div class="cloud-msg" id="'+slot+'Msg"></div>';
+      var img=$("#"+thumbId); displayPhoto(path,img); img.style.cursor="pointer";
       img.onclick=function(){ if(img.src)window.open(img.src,"_blank"); };
-      $("#photoReplace").onclick=function(){ $("#fPhoto").click(); };
-      $("#photoOpen").onclick=function(){ if(img.src)window.open(img.src,"_blank"); };
-      $("#photoRemove").onclick=function(){ if(confirm("Remove this photo?"))removePhoto(task); };
     }else{
-      box.innerHTML='<div class="photo-empty"><button class="btn sm" id="photoAdd">+ Add photo</button><span class="autonote">Large photos shrink to ≤1MB automatically.</span></div><div class="cloud-msg" id="photoMsg"></div>';
-      $("#photoAdd").onclick=function(){ $("#fPhoto").click(); };
+      box.innerHTML= canEdit
+        ? '<div class="photo-empty"><button class="btn sm" data-pa="add" data-slot="'+slot+'">+ Add photo</button><span class="autonote">Shrinks to ≤1MB automatically.</span></div><div class="cloud-msg" id="'+slot+'Msg"></div>'
+        : '<div class="autonote">No photo yet.</div>';
     }
+  }
+  function renderPhotoSection(task){
+    if(!task)return;
+    photoBlock("instruction",task.instructionPhoto,canEditInstruction(task),"Instruction photo");
+    photoBlock("completion",task.completionPhoto,canEditCompletion(task),"Completion photo");
   }
 
   /* ---------------- Date helpers ---------------- */
@@ -819,8 +945,9 @@
     var out=[];
     var f=(filter||"").trim().toLowerCase();
     function matches(t){
-      if(!f)return true;
-      return (t.name||"").toLowerCase().indexOf(f)>=0 || (t.pic||"").toLowerCase().indexOf(f)>=0;
+      var okText = !f || (t.name||"").toLowerCase().indexOf(f)>=0 || profileName(t.assignee).toLowerCase().indexOf(f)>=0;
+      var okMine = !myTasksOnly || (me && t.assignee===me.id);
+      return okText && okMine;
     }
     function subtreeMatch(t){
       if(matches(t))return true;
@@ -901,9 +1028,10 @@
         '<td><div class="taskname" style="padding-left:'+indent+'px">'+chev+
           '<span class="dot" style="background:var('+st.c+')"></span>'+
           '<span class="name" title="'+esc(t.name)+'">'+esc(t.name||"(untitled)")+'</span>'+
-          (t.photo?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
+          ((t.instructionPhoto||t.completionPhoto)?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
+          ((me&&t.assignee===me.id)?'<span class="mine-tag" title="Assigned to you">You</span>':'')+
           '</div></td>'+
-        '<td>'+esc(t.pic||"—")+'</td>'+
+        '<td>'+esc(profileName(t.assignee)||"—")+'</td>'+
         '<td>'+(t.priority?'<span class="prio '+t.priority+'">'+t.priority+'</span>':"—")+'</td>'+
         '<td><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span></td>'+
         '<td class="num"><div class="pctcell"><span class="track"><i style="width:'+pct+'%;background:var('+st.c+')"></i></span><span class="n">'+pct+'</span></div></td>'+
@@ -1095,77 +1223,102 @@
   function refreshAll(){ renderProjSelect(); render(); }
 
   /* ---------------- Drawer ---------------- */
+  function buildAssigneeOptions(selId){
+    var s=$("#fAssignee"); if(!s)return;
+    var opts='<option value="">— Unassigned —</option>';
+    profiles.filter(function(p){return p.role==="technician"||p.role==="manager";})
+      .forEach(function(p){ opts+='<option value="'+p.id+'"'+(p.id===selId?" selected":"")+'>'+esc((p.name||p.email)+" · "+p.role)+'</option>'; });
+    s.innerHTML=opts; s.value=selId||"";
+  }
   function openDrawer(id){
     editingId=id; var t=taskById(id); if(!t)return;
     var kids=hasChildren(id), r=resolve(t), wIdx=wbsIndex();
+    var mgr=isManager(), mine=(me&&t.assignee===me.id), canComplete=canEditCompletion(t);
     $("#drawerWbs").textContent=wIdx[id]||"";
-    $("#drawerTitle").textContent= kids?"Edit task (parent)":"Edit task";
-    $("#fName").value=t.name||""; $("#fPic").value=t.pic||"";
+    $("#drawerTitle").textContent= kids?"Task (parent)":(mgr?"Edit task":(mine?"Complete task":"Task (view)"));
+    $("#fName").value=t.name||"";
     $("#fPrio").value=t.priority||"Medium"; $("#fStatus").value=t.status||"not_started";
     $("#fPct").value= kids? r.percent : (t.percent||0);
     setD("#fBaseS",kids?r.baseStart:t.baseStart); setD("#fBaseE",kids?r.baseEnd:t.baseEnd);
     setD("#fPlanS",kids?r.planStart:t.planStart); setD("#fPlanE",kids?r.planEnd:t.planEnd);
     setD("#fActS",kids?r.actStart:t.actStart); setD("#fActE",kids?r.actEnd:t.actEnd);
     $("#fDep").value=t.dependency||""; $("#fRemark").value=t.remarks||"";
-    // parent: dates & pct auto
-    ["#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE"].forEach(function(sel){ $(sel).disabled=kids; });
+    buildAssigneeOptions(t.assignee);
+    $("#fTool").value=t.toolCribItems||""; $("#fClose").value=t.closeDate||"";
+    $("#fTech").value=t.techRemarks||""; $("#fReason").value=t.inProgressReason||"";
     $("#autoNote").style.display=kids?"":"none";
+    // enable/disable by role — manager edits the plan; assignee/manager fills completion
+    ["#fName","#fPrio","#fDep","#fRemark","#fAssignee"].forEach(function(sel){ $(sel).disabled=!mgr; });
+    ["#fBaseS","#fBaseE","#fPlanS","#fPlanE"].forEach(function(sel){ $(sel).disabled=!mgr||kids; });
+    ["#fStatus","#fPct","#fActS","#fActE","#fTool","#fClose","#fTech","#fReason"].forEach(function(sel){ $(sel).disabled=kids||!canComplete; });
     renderPhotoSection(t);
+    ["#addSub","#moveUp","#moveDown","#delTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; });
     $("#scrim").classList.add("open"); $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
-    setTimeout(function(){$("#fName").focus();},60);
+    if(mgr) setTimeout(function(){$("#fName").focus();},60);
     if(view==="table")renderTable();
     function setD(sel,v){ $(sel).value=v||""; }
   }
   function closeDrawer(){
-    editingId=null;
+    flushUpserts(); editingId=null;
     $("#scrim").classList.remove("open"); $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden","true");
     render();
   }
+  var _upsertTimer=null, _upsertPend={};
+  function queueUpsert(t){ _upsertPend[t.id]=t; clearTimeout(_upsertTimer); _upsertTimer=setTimeout(flushUpserts,800); }
+  function flushUpserts(){ clearTimeout(_upsertTimer); var list=Object.keys(_upsertPend); _upsertPend={}; list.forEach(function(k){ var t=taskById(k); if(t)upsertTask(t); }); }
   function commitDrawer(){
     if(!editingId)return; var t=taskById(editingId); if(!t)return;
-    var kids=hasChildren(editingId);
-    t.name=$("#fName").value; t.pic=$("#fPic").value;
-    t.priority=$("#fPrio").value; t.status=$("#fStatus").value;
-    t.dependency=$("#fDep").value; t.remarks=$("#fRemark").value;
-    if(!kids){
-      t.percent=clamp(+$("#fPct").value||0);
-      t.baseStart=$("#fBaseS").value; t.baseEnd=$("#fBaseE").value;
-      t.planStart=$("#fPlanS").value; t.planEnd=$("#fPlanE").value;
-      t.actStart=$("#fActS").value; t.actEnd=$("#fActE").value;
+    var kids=hasChildren(editingId), mgr=isManager(), canComplete=canEditCompletion(t);
+    if(mgr){
+      t.name=$("#fName").value; t.priority=$("#fPrio").value;
+      t.dependency=$("#fDep").value; t.remarks=$("#fRemark").value; t.assignee=$("#fAssignee").value||"";
+      if(!kids){ t.baseStart=$("#fBaseS").value; t.baseEnd=$("#fBaseE").value; t.planStart=$("#fPlanS").value; t.planEnd=$("#fPlanE").value; }
     }
-    save(); renderKpis();
+    if(canComplete && !kids){
+      t.status=$("#fStatus").value; t.percent=clamp(+$("#fPct").value||0);
+      t.actStart=$("#fActS").value; t.actEnd=$("#fActE").value;
+      t.toolCribItems=$("#fTool").value; t.closeDate=$("#fClose").value;
+      t.techRemarks=$("#fTech").value; t.inProgressReason=$("#fReason").value;
+    }
+    save(); queueUpsert(t); renderKpis();
   }
 
   /* ---------------- Task ops ---------------- */
   function addTask(parentId){
-    var t={id:uid(),name:"",pic:"",priority:"Medium",status:"not_started",percent:0,
-      baseStart:"",baseEnd:"",planStart:"",planEnd:"",actStart:"",actEnd:"",
-      dependency:"",remarks:"",parentId:parentId||null,collapsed:false};
-    tasks().push(t);
-    if(parentId){ var p=taskById(parentId); if(p)p.collapsed=false; }
-    save(); render(); openDrawer(t.id);
+    if(!isManager())return;
+    var proj=activeProject(); if(!proj.id){ toast("Create a project first."); return; }
+    var sibs=(parentId?children(parentId):roots());
+    var pos=sibs.reduce(function(m,x){return Math.max(m,x.position||0);},0)+1;
+    var t={id:uuid(),projectId:proj.id,parentId:parentId||null,position:pos,name:"",priority:"Medium",status:"not_started",percent:0,
+      baseStart:"",baseEnd:"",planStart:"",planEnd:"",actStart:"",actEnd:"",dependency:"",remarks:"",
+      assignee:"",instructionPhoto:"",completionPhoto:"",toolCribItems:"",closeDate:"",techRemarks:"",inProgressReason:"",collapsed:false};
+    proj.tasks.push(t);
+    if(parentId){ var p=taskById(parentId); if(p){p.collapsed=false; setCollapsed(p.id,false);} }
+    upsertTask(t); save(); render(); openDrawer(t.id);
   }
   function deleteTask(id){
+    if(!isManager())return;
     var ids=[id]; (function collect(pid){ children(pid).forEach(function(c){ids.push(c.id);collect(c.id);}); })(id);
-    ids.forEach(function(tid){ var tk=taskById(tid); if(tk&&tk.photo&&tk.photo.path){ idbDel(tk.photo.path); deletePhotoObj(tk.photo.path); } });
-    activeProject().tasks=tasks().filter(function(t){return ids.indexOf(t.id)<0;});
-    save();
+    ids.forEach(function(tid){ var tk=taskById(tid); if(tk){ ["instructionPhoto","completionPhoto"].forEach(function(f){ if(tk[f]){ idbDel(tk[f]); deletePhotoObj(tk[f]); } }); } });
+    var proj=activeProject(); proj.tasks=proj.tasks.filter(function(t){return ids.indexOf(t.id)<0;});
+    deleteTaskRows(ids); save();
   }
-  // Swap a task with its previous/next sibling, keeping each subtree intact, then
-  // rebuild the flat task array in tree order so WBS numbers renumber correctly.
+  // Swap a task with its previous/next sibling, renumber positions, persist changed rows.
   function move(id,dir){
+    if(!isManager())return;
     var t=taskById(id); if(!t)return;
     var parentId=t.parentId||null;
-    var sibs=(parentId?children(parentId):roots()).slice();
+    var byPos=function(a,b){return (a.position||0)-(b.position||0);};
+    var sibs=(parentId?children(parentId):roots()).slice().sort(byPos);
     var pos=sibs.indexOf(t), swap=pos+dir;
     if(swap<0||swap>=sibs.length)return;
     var tmp=sibs[pos]; sibs[pos]=sibs[swap]; sibs[swap]=tmp;
-    var result=[];
-    function childOrder(pid){ return pid===parentId?sibs:children(pid); }
+    sibs.forEach(function(x,i){ if(x.position!==i+1){ x.position=i+1; upsertTask(x); } });
+    var proj=activeProject(), result=[];
+    function childOrder(pid){ return pid===parentId?sibs:children(pid).slice().sort(byPos); }
     function emit(list){ list.forEach(function(x){ result.push(x); emit(childOrder(x.id)); }); }
-    emit(parentId?roots():sibs);
-    activeProject().tasks=result;
-    save();
+    emit(parentId?roots().slice().sort(byPos):sibs);
+    proj.tasks=result; save();
   }
 
   /* ---------------- Export PNG ---------------- */
@@ -1253,8 +1406,18 @@
     $("#search").addEventListener("input",function(e){filter=e.target.value; if(view==="table")renderTable(); else renderGantt();});
 
     // drawer live-commit
-    ["#fName","#fPic","#fPrio","#fStatus","#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE","#fDep","#fRemark"]
-      .forEach(function(sel){ var el=$(sel); el.addEventListener("input",commitDrawer); el.addEventListener("change",commitDrawer); });
+    ["#fName","#fPrio","#fStatus","#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE","#fDep","#fRemark","#fAssignee","#fTool","#fClose","#fTech","#fReason"]
+      .forEach(function(sel){ var el=$(sel); if(!el)return; el.addEventListener("input",commitDrawer); el.addEventListener("change",commitDrawer); });
+    // photo add/replace/open/remove (delegated); one hidden file input, remember which slot
+    var pendingSlot="instruction";
+    $("#drawer").addEventListener("click",function(e){
+      var b=e.target.closest("[data-pa]"); if(!b)return;
+      var slot=b.getAttribute("data-slot")||"instruction", act=b.getAttribute("data-pa");
+      var t=editingId?taskById(editingId):null; if(!t)return;
+      if(act==="add"||act==="replace"){ pendingSlot=slot; $("#fPhoto").click(); }
+      else if(act==="remove"){ if(confirm("Remove this photo?"))removePhoto(t,slot); }
+    });
+    $("#fPhoto").addEventListener("change",function(e){ var f=e.target.files[0]; if(f&&editingId){ var t=taskById(editingId); if(t)attachPhoto(t,pendingSlot,f); } e.target.value=""; });
     $("#scrim").addEventListener("click",closeDrawer);
     $("#addSub").addEventListener("click",function(){ if(editingId){var pid=editingId; commitDrawer(); addTask(pid);} });
     $("#delTask").addEventListener("click",function(){ if(editingId && confirm("Delete this task"+(hasChildren(editingId)?" and its sub-tasks":"")+"?")){ deleteTask(editingId); closeDrawer(); } });
@@ -1278,18 +1441,21 @@
     // projects
     $("#projSel").addEventListener("change",function(e){ state.activeProjectId=e.target.value; filter=""; $("#search").value=""; save(); render(); });
     $("#projAdd").addEventListener("click",function(){
+      if(!isManager())return;
       var nm=prompt("New project name / Nama projek baharu:","New Project"); if(nm===null)return;
-      var p={id:uid(),name:nm.trim()||"Untitled Project",tasks:[]}; state.projects.push(p); state.activeProjectId=p.id;
-      save(); renderProjSelect(); render();
+      var pos=state.projects.reduce(function(m,x){return Math.max(m,x.position||0);},0)+1;
+      var p={id:uuid(),name:nm.trim()||"Untitled Project",position:pos,tasks:[]}; state.projects.push(p); state.activeProjectId=p.id;
+      upsertProject(p); save(); renderProjSelect(); render();
     });
     $("#projMenu").addEventListener("click",function(){
-      var p=activeProject();
+      if(!isManager())return;
+      var p=activeProject(); if(!p.id)return;
       var act=prompt('Type "rename" to rename, or "delete" to remove project "'+p.name+'":',"rename");
       if(act===null)return; act=act.trim().toLowerCase();
-      if(act==="rename"){ var nm=prompt("New name:",p.name); if(nm!==null){p.name=nm.trim()||p.name;} }
+      if(act==="rename"){ var nm=prompt("New name:",p.name); if(nm!==null){ p.name=nm.trim()||p.name; upsertProject(p); } }
       else if(act==="delete"){
         if(state.projects.length<=1){ alert("Keep at least one project."); return; }
-        if(confirm('Delete project "'+p.name+'" and all its tasks?')){ state.projects=state.projects.filter(function(x){return x.id!==p.id;}); state.activeProjectId=state.projects[0].id; }
+        if(confirm('Delete project "'+p.name+'" and all its tasks?')){ var did=p.id; state.projects=state.projects.filter(function(x){return x.id!==did;}); state.activeProjectId=state.projects[0].id; deleteProjectRow(did); }
       }
       save(); renderProjSelect(); render();
     });
@@ -1318,8 +1484,12 @@
     $("#cloudScrim").addEventListener("click",closeCloud);
     document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("#cloudModal").classList.contains("open"))closeCloud(); });
 
-    // photo picker
-    $("#fPhoto").addEventListener("change",function(e){ var f=e.target.files[0]; if(f&&editingId){ var t=taskById(editingId); if(t)attachPhoto(t,f); } e.target.value=""; });
+    // team & roles + my-tasks filter
+    $("#teamBtn").addEventListener("click",openTeam);
+    $("#teamClose").addEventListener("click",closeTeam);
+    $("#teamScrim").addEventListener("click",closeTeam);
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape" && $("#teamModal").classList.contains("open"))closeTeam(); });
+    $("#mineToggle").addEventListener("change",function(e){ myTasksOnly=e.target.checked; if(view==="table")renderTable(); else renderGantt(); });
 
     // pull latest when the app returns to the foreground; retry uploads when back online
     document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&signedIn()){ syncPull(); uploadPending(); } });
@@ -1327,15 +1497,13 @@
   }
 
   /* ---------------- Init ---------------- */
-  state=load();
-  activeProject();
+  loadCache();
   loadAuth();
   applyTheme(currentTheme());
   $("#verTag").textContent=VERSION;
-  renderProjSelect();
   bind();
-  render();
   updateCloudUI();
+  applyGate();
   if(signedIn()) startSync();
 })();
 </script>
