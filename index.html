@@ -502,6 +502,7 @@
 <aside class="modal chat-modal" id="chatModal" role="dialog" aria-modal="true" aria-hidden="true">
   <header>
     <span class="t">Ask about your tasks</span>
+    <label class="switch" id="aiWrap" style="margin-left:auto" title="Use AI (free-form) or fast local lookup"><input type="checkbox" id="aiToggle" checked> AI</label>
     <button class="btn icon" id="chatClose" title="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </header>
   <div class="chat-msgs" id="chatMsgs"></div>
@@ -521,7 +522,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.3";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.4";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -1424,12 +1425,46 @@
   /* ---------------- Ask assistant (local, reads all app data) ---------------- */
   function openChat(){
     $("#chatScrim").classList.add("open"); $("#chatModal").classList.add("open"); $("#chatModal").setAttribute("aria-hidden","false");
-    if(!$("#chatMsgs").childNodes.length) addMsg("Hi! Ask me about your tasks — try “ringkasan” (summary), a person’s name, a status (lewat / sedang / siap), or a keyword like “RFI”. I read every project in the app.","bot");
+    if(!$("#chatMsgs").childNodes.length) addMsg("Hi! Ask me anything about your tasks — I can summarise, analyse workload, find what’s overdue, suggest priorities, and more. With the AI toggle on I understand free-form questions (EN/Malay); off, I do fast keyword lookups.","bot");
     setTimeout(function(){$("#chatInput").focus();},60);
   }
   function closeChat(){ $("#chatScrim").classList.remove("open"); $("#chatModal").classList.remove("open"); $("#chatModal").setAttribute("aria-hidden","true"); }
-  function addMsg(text,who){ var d=document.createElement("div"); d.className="chat-b "+who; d.textContent=text; var m=$("#chatMsgs"); m.appendChild(d); m.scrollTop=m.scrollHeight; }
-  function sendChat(){ var q=($("#chatInput").value||"").trim(); if(!q)return; addMsg(q,"user"); $("#chatInput").value=""; setTimeout(function(){ addMsg(answerQuery(q),"bot"); },50); }
+  var _chatHist=[];
+  function addMsg(text,who){ var d=document.createElement("div"); d.className="chat-b "+who; d.textContent=text; var m=$("#chatMsgs"); m.appendChild(d); m.scrollTop=m.scrollHeight; _chatHist.push({role:who==="user"?"user":"assistant",content:text}); if(_chatHist.length>16)_chatHist=_chatHist.slice(-16); }
+  function addThinking(){ var d=document.createElement("div"); d.className="chat-b bot"; d.textContent="…"; var m=$("#chatMsgs"); m.appendChild(d); m.scrollTop=m.scrollHeight; return d; }
+  function useAI(){ var t=$("#aiToggle"); return signedIn() && t && t.checked; }
+  function aiContext(){
+    var nm={}; profiles.forEach(function(p){nm[p.id]=p.name||p.email;});
+    return { today:new Date().toISOString().slice(0,10),
+      me: me?{name:me.name||me.email,role:me.role}:null,
+      people: profiles.map(function(p){return {name:p.name||p.email,role:p.role};}),
+      projects: state.projects.map(function(p){ return {project:p.name, tasks:(p.tasks||[]).map(function(t){ return {
+        name:t.name, assignee:nm[t.assignee]||"unassigned", priority:t.priority, status:t.status, percent:clamp(+t.percent||0),
+        baseline:[t.baseStart||"",t.baseEnd||""], planned:[t.planStart||"",t.planEnd||""], actual:[t.actStart||"",t.actEnd||""],
+        dependency:t.dependency||"", remarks:t.remarks||"", toolCribItems:t.toolCribItems||"", closeDate:t.closeDate||"",
+        techRemarks:t.techRemarks||"", inProgressReason:t.inProgressReason||"", hasInstructionPhoto:!!t.instructionPhoto, hasCompletionPhoto:!!t.completionPhoto
+      };})};}) };
+  }
+  function aiAsk(q,hist){
+    return ensureToken().then(function(){
+      return fetch(SB_URL+"/functions/v1/ask",{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+auth.access_token,"Content-Type":"application/json"},body:JSON.stringify({question:q,history:hist,tasks:aiContext()})});
+    }).then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:{error:"bad response ("+r.status+")"}};}); });
+  }
+  function sendChat(){
+    var q=($("#chatInput").value||"").trim(); if(!q)return;
+    var hist=_chatHist.slice(-8);
+    addMsg(q,"user"); $("#chatInput").value="";
+    if(useAI()){
+      var th=addThinking();
+      aiAsk(q,hist).then(function(res){
+        if(th.parentNode)th.parentNode.removeChild(th);
+        if(res.ok && res.j && res.j.answer) addMsg(res.j.answer,"bot");
+        else addMsg("⚠ AI unavailable ("+((res.j&&res.j.error)||"error")+")\n\nLocal answer:\n"+answerQuery(q),"bot");
+      }).catch(function(){ if(th.parentNode)th.parentNode.removeChild(th); addMsg("Offline — local answer:\n"+answerQuery(q),"bot"); });
+    } else {
+      setTimeout(function(){ addMsg(answerQuery(q),"bot"); },40);
+    }
+  }
 
   function allTasksFlat(){ var a=[]; state.projects.forEach(function(p){(p.tasks||[]).forEach(function(t){a.push({t:t,proj:p});});}); return a; }
   function taskLine(t,proj){ var st=STATUS_MAP[t.status]||STATUS[0]; var who=profileName(t.assignee)||"unassigned"; var dt=(t.planStart||t.planEnd)?(" ["+(t.planStart||"?")+"→"+(t.planEnd||"?")+"]"):""; return "• "+(t.name||"(untitled)")+" — "+st.label+" "+clamp(+t.percent||0)+"% · "+who+dt+" ("+proj.name+")"; }
