@@ -496,7 +496,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.1";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -1496,15 +1496,33 @@
     window.addEventListener("online",function(){ if(signedIn()){ uploadPending(); syncPull(); } });
   }
 
+  /* ---------------- Auth redirect (magic link / password recovery) ---------------- */
+  function parseHashParams(){ var h=(location.hash||"").replace(/^#/,""); var q={}; h.split("&").forEach(function(kv){ if(!kv)return; var i=kv.indexOf("="); if(i<0)return; q[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1)); }); return q; }
+  function handleAuthRedirect(){
+    var p=parseHashParams();
+    if(!p.access_token)return Promise.resolve(false);
+    return fetch(SB_URL+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+p.access_token}})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(u){
+        if(!u||!u.id)return false;
+        auth={access_token:p.access_token,refresh_token:p.refresh_token||"",expires_at:Date.now()+((+p.expires_in||3600)*1000),user_id:u.id,email:u.email};
+        saveAuth();
+        try{history.replaceState(null,"",location.pathname+location.search);}catch(e){location.hash="";}
+        return true;
+      }).catch(function(){return false;});
+  }
+
   /* ---------------- Init ---------------- */
   loadCache();
   loadAuth();
   applyTheme(currentTheme());
   $("#verTag").textContent=VERSION;
   bind();
-  updateCloudUI();
-  applyGate();
-  if(signedIn()) startSync();
+  handleAuthRedirect().then(function(){
+    updateCloudUI();
+    applyGate();
+    if(signedIn()) startSync();
+  });
 })();
 </script>
 <script>
