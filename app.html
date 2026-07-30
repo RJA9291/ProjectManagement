@@ -237,8 +237,8 @@
   .chat-b.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-bottom-left-radius:4px}
   .chat-input{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
   .chat-input input{flex:1}
-  td.rowact{white-space:nowrap;text-align:right;padding-right:8px}
-  .minibtn{border:1px solid var(--border);background:var(--surface);border-radius:5px;cursor:pointer;font-size:9px;line-height:1;padding:4px 6px;color:var(--text-dim);margin-left:2px}
+  td.rowact,th.acthead{white-space:nowrap;text-align:center;padding:6px 4px;width:1%}
+  .minibtn{border:1px solid var(--border);background:var(--surface);border-radius:5px;cursor:pointer;font-size:9px;line-height:1;padding:4px 5px;color:var(--text-dim);margin:0 1px}
   .minibtn:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
   .proj-chip{flex:none;font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-weak);padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 
@@ -319,6 +319,7 @@
     <div class="tablewrap">
       <table>
         <thead><tr>
+          <th class="acthead"></th>
           <th>WBS</th>
           <th>Task / Tugas</th>
           <th>PIC</th>
@@ -333,7 +334,6 @@
           <th title="Actual End — sebenar">Act End</th>
           <th>Dependency</th>
           <th>Remarks / Catatan</th>
-          <th class="acthead"></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -511,7 +511,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.7";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.8";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -1055,6 +1055,9 @@
         : '<span style="width:16px;flex:none"></span>';
       var pct=r.percent;
       html+='<tr data-id="'+t.id+'" class="'+(row.hasChildren?"parent":"")+(editingId===t.id?" sel":"")+'">'+
+        ((isManager()&&!inAllMode())
+          ? '<td class="rowact"><button class="minibtn" data-move="up" data-id="'+t.id+'" title="Move up">▲</button><button class="minibtn" data-move="down" data-id="'+t.id+'" title="Move down">▼</button></td>'
+          : '<td class="rowact"></td>')+
         '<td class="wbs">'+row.wbs+'</td>'+
         '<td><div class="taskname" style="padding-left:'+indent+'px">'+chev+
           (inAllMode()?'<span class="proj-chip" title="Project">'+esc(projNameOf(t))+'</span>':'')+
@@ -1072,9 +1075,6 @@
         dcell(r.actStart)+dcell(r.actEnd)+
         '<td class="depref">'+esc(t.dependency||"")+'</td>'+
         '<td class="remark" title="'+esc(t.remarks)+'">'+esc(t.remarks||"")+'</td>'+
-        ((isManager()&&!inAllMode())
-          ? '<td class="rowact"><button class="minibtn" data-move="up" data-id="'+t.id+'" title="Move up">▲</button><button class="minibtn" data-move="down" data-id="'+t.id+'" title="Move down">▼</button></td>'
-          : '<td class="rowact"></td>')+
       '</tr>';
     });
     tb.innerHTML=html;
