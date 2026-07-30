@@ -116,8 +116,9 @@
   td.date{font-family:var(--mono);font-size:12px;color:var(--text-dim);font-variant-numeric:tabular-nums}
   td.date.miss{color:var(--text-faint)}
   .wbs{font-family:var(--mono);font-size:12px;color:var(--text-dim);font-variant-numeric:tabular-nums}
-  .taskname{display:flex;align-items:center;gap:7px;min-width:220px;max-width:340px}
-  .taskname .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .taskname{display:flex;align-items:flex-start;gap:7px;min-width:220px;max-width:340px}
+  .taskname .name{white-space:normal;overflow-wrap:anywhere;min-width:0;flex:1}
+  .taskname .chev,.taskname .dot,.taskname .proj-chip,.taskname .photo-ind,.taskname .mine-tag{margin-top:1px}
   .chev{flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-dim);cursor:pointer}
   .chev:hover{background:var(--surface-3)}
   .chev svg{width:12px;height:12px;transition:transform .15s}
@@ -511,7 +512,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.8";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.9";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
