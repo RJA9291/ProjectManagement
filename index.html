@@ -257,6 +257,10 @@
   .chat-b.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border);border-bottom-left-radius:4px}
   .chat-input{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
   .chat-input input{flex:1}
+  td.rowact{white-space:nowrap;text-align:right;padding-right:8px}
+  .minibtn{border:1px solid var(--border);background:var(--surface);border-radius:5px;cursor:pointer;font-size:9px;line-height:1;padding:4px 6px;color:var(--text-dim);margin-left:2px}
+  .minibtn:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+  .proj-chip{flex:none;font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-weak);padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 
   /* ---------- Print ---------- */
   @media print{
@@ -349,6 +353,7 @@
           <th title="Actual End — sebenar">Act End</th>
           <th>Dependency</th>
           <th>Remarks / Catatan</th>
+          <th class="acthead"></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -414,6 +419,10 @@
       <div class="field"><label for="fPrio">Priority / Keutamaan</label>
         <select id="fPrio"><option>High</option><option selected>Medium</option><option>Low</option></select>
       </div>
+    </div>
+    <div class="field" id="moveProjWrap" style="display:none">
+      <label for="fMoveProj">Project / Projek <span class="fieldhint">(move this task &amp; its sub-tasks)</span></label>
+      <select id="fMoveProj"></select>
     </div>
 
     <div class="datepair">
@@ -522,7 +531,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.5";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.6";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -565,7 +574,12 @@
   function save(){ persist(); }   // local cache only; DB writes happen per-row (upsertTask/…)
   function loadCache(){ try{var s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.projects)state=s;}catch(e){} }
 
+  var ALL="__all__";
+  function inAllMode(){ return state.activeProjectId===ALL; }
+  function allTasksMerged(){ var a=[]; state.projects.forEach(function(p){ (p.tasks||[]).forEach(function(t){ a.push(t); }); }); return a; }
+  function projNameOf(t){ var p=state.projects.filter(function(x){return x.id===t.projectId;})[0]; return p?p.name:""; }
   function activeProject(){
+    if(inAllMode()) return {id:ALL,name:"All projects",tasks:allTasksMerged()};
     if(!state.projects.length)return {id:"",name:"",tasks:[]};
     var p=state.projects.filter(function(x){return x.id===state.activeProjectId;})[0];
     if(!p){p=state.projects[0]; state.activeProjectId=p.id;}
@@ -1050,7 +1064,7 @@
   }
   function renderTable(){
     var rows=flatten(), tb=$("#tbody"), tnow=today0();
-    if(!rows.length){ tb.innerHTML='<tr><td colspan="14"><div class="empty">No tasks yet. Click <b>Add Task</b> to start, or clear the filter.</div></td></tr>'; return; }
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="15"><div class="empty">No tasks'+(inAllMode()?"":" in this project")+' yet.'+(isManager()&&!inAllMode()?' Click <b>Add Task</b> to start.':'')+'</div></td></tr>'; return; }
     var html="";
     rows.forEach(function(row){
       var t=row.task, r=row.resolved, st=STATUS_MAP[t.status]||STATUS[0];
@@ -1063,6 +1077,7 @@
       html+='<tr data-id="'+t.id+'" class="'+(row.hasChildren?"parent":"")+(editingId===t.id?" sel":"")+'">'+
         '<td class="wbs">'+row.wbs+'</td>'+
         '<td><div class="taskname" style="padding-left:'+indent+'px">'+chev+
+          (inAllMode()?'<span class="proj-chip" title="Project">'+esc(projNameOf(t))+'</span>':'')+
           '<span class="dot" style="background:var('+st.c+')"></span>'+
           '<span class="name" title="'+esc(t.name)+'">'+esc(t.name||"(untitled)")+'</span>'+
           ((t.instructionPhoto||t.completionPhoto)?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
@@ -1077,6 +1092,9 @@
         dcell(r.actStart)+dcell(r.actEnd)+
         '<td class="depref">'+esc(t.dependency||"")+'</td>'+
         '<td class="remark" title="'+esc(t.remarks)+'">'+esc(t.remarks||"")+'</td>'+
+        ((isManager()&&!inAllMode())
+          ? '<td class="rowact"><button class="minibtn" data-move="up" data-id="'+t.id+'" title="Move up">▲</button><button class="minibtn" data-move="down" data-id="'+t.id+'" title="Move down">▼</button></td>'
+          : '<td class="rowact"></td>')+
       '</tr>';
     });
     tb.innerHTML=html;
@@ -1276,6 +1294,12 @@
     setD("#fActS",kids?r.actStart:t.actStart); setD("#fActE",kids?r.actEnd:t.actEnd);
     $("#fDep").value=t.dependency||""; $("#fRemark").value=t.remarks||"";
     buildAssigneeOptions(t.assignee);
+    // move-to-project (manager only) — only meaningful for top-level tasks with 2+ projects
+    var mpWrap=$("#moveProjWrap"), mp=$("#fMoveProj");
+    if(mgr && !t.parentId && state.projects.length>1){
+      mp.innerHTML=state.projects.map(function(p){return '<option value="'+p.id+'"'+(p.id===t.projectId?" selected":"")+'>'+esc(p.name)+'</option>';}).join("");
+      mp.value=t.projectId; mpWrap.style.display="";
+    } else { mpWrap.style.display="none"; }
     $("#fTool").value=t.toolCribItems||""; $("#fClose").value=t.closeDate||"";
     $("#fTech").value=t.techRemarks||""; $("#fReason").value=t.inProgressReason||"";
     $("#autoNote").style.display=kids?"":"none";
@@ -1318,6 +1342,7 @@
   /* ---------------- Task ops ---------------- */
   function addTask(parentId){
     if(!isManager())return;
+    if(inAllMode()){ toast("Pick a specific project first to add a task."); return; }
     var proj=activeProject(); if(!proj.id){ toast("Create a project first."); return; }
     var sibs=(parentId?children(parentId):roots());
     var pos=sibs.reduce(function(m,x){return Math.max(m,x.position||0);},0)+1;
@@ -1332,12 +1357,12 @@
     if(!isManager())return;
     var ids=[id]; (function collect(pid){ children(pid).forEach(function(c){ids.push(c.id);collect(c.id);}); })(id);
     ids.forEach(function(tid){ var tk=taskById(tid); if(tk){ ["instructionPhoto","completionPhoto"].forEach(function(f){ if(tk[f]){ idbDel(tk[f]); deletePhotoObj(tk[f]); } }); } });
-    var proj=activeProject(); proj.tasks=proj.tasks.filter(function(t){return ids.indexOf(t.id)<0;});
+    state.projects.forEach(function(p){ p.tasks=(p.tasks||[]).filter(function(t){return ids.indexOf(t.id)<0;}); });
     deleteTaskRows(ids); save();
   }
   // Swap a task with its previous/next sibling, renumber positions, persist changed rows.
   function move(id,dir){
-    if(!isManager())return;
+    if(!isManager()||inAllMode())return;
     var t=taskById(id); if(!t)return;
     var parentId=t.parentId||null;
     var byPos=function(a,b){return (a.position||0)-(b.position||0);};
@@ -1351,6 +1376,23 @@
     function emit(list){ list.forEach(function(x){ result.push(x); emit(childOrder(x.id)); }); }
     emit(parentId?roots().slice().sort(byPos):sibs);
     proj.tasks=result; save();
+  }
+  // Move a task (and its sub-tasks) to another project; it becomes a top-level task there.
+  function moveTaskToProject(id, projId){
+    if(!isManager())return;
+    var t=taskById(id); if(!t || !projId || t.projectId===projId)return;
+    var target=state.projects.filter(function(p){return p.id===projId;})[0]; if(!target)return;
+    var srcProj=state.projects.filter(function(p){return p.id===t.projectId;})[0];
+    var ids=[id]; (function collect(pid){ children(pid).forEach(function(c){ids.push(c.id);collect(c.id);}); })(id);
+    var moved=ids.map(function(tid){return taskById(tid);}).filter(Boolean);
+    var maxPos=target.tasks.reduce(function(m,x){return Math.max(m,x.position||0);},0);
+    t.parentId=null; t.position=maxPos+1;
+    moved.forEach(function(mt){ mt.projectId=projId; });
+    if(srcProj){ srcProj.tasks=srcProj.tasks.filter(function(x){return ids.indexOf(x.id)<0;}); }
+    moved.forEach(function(mt){ target.tasks.push(mt); });
+    moved.forEach(function(mt){ upsertTask(mt); });
+    state.activeProjectId=projId;
+    save(); renderProjSelect(); closeDrawer(); toast("Moved to "+target.name);
   }
 
   /* ---------------- Export PNG ---------------- */
@@ -1404,10 +1446,11 @@
   /* ---------------- Projects ---------------- */
   function renderProjSelect(){
     var sel=$("#projSel"); sel.innerHTML="";
+    if(state.projects.length>1){ var oa=document.createElement("option"); oa.value=ALL; oa.textContent="★ All projects"; sel.appendChild(oa); }
     state.projects.forEach(function(p){
       var o=document.createElement("option"); o.value=p.id; o.textContent=p.name; sel.appendChild(o);
     });
-    sel.value=activeProject().id;
+    sel.value=inAllMode()?ALL:activeProject().id;
   }
 
   /* ---------------- Theme ---------------- */
@@ -1524,7 +1567,9 @@
 
     $("#tbody").addEventListener("click",function(e){
       var col=e.target.closest("[data-collapse]");
-      if(col){ e.stopPropagation(); var t=taskById(col.getAttribute("data-collapse")); if(t){t.collapsed=!t.collapsed;save();renderTable();} return; }
+      if(col){ e.stopPropagation(); var t=taskById(col.getAttribute("data-collapse")); if(t){t.collapsed=!t.collapsed; setCollapsed(t.id,t.collapsed); save();renderTable();} return; }
+      var mv=e.target.closest("[data-move]");
+      if(mv){ e.stopPropagation(); move(mv.getAttribute("data-id"), mv.getAttribute("data-move")==="up"?-1:1); if(view==="table")renderTable(); else renderGantt(); return; }
       var tr=e.target.closest("tr[data-id]"); if(tr)openDrawer(tr.getAttribute("data-id"));
     });
 
@@ -1534,6 +1579,7 @@
     // drawer live-commit
     ["#fName","#fPrio","#fStatus","#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE","#fDep","#fRemark","#fAssignee","#fTool","#fClose","#fTech","#fReason"]
       .forEach(function(sel){ var el=$(sel); if(!el)return; el.addEventListener("input",commitDrawer); el.addEventListener("change",commitDrawer); });
+    $("#fMoveProj").addEventListener("change",function(e){ if(editingId)moveTaskToProject(editingId, e.target.value); });
     // photo add/replace/open/remove (delegated); one hidden file input, remember which slot
     var pendingSlot="instruction";
     $("#drawer").addEventListener("click",function(e){
