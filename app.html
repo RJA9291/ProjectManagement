@@ -511,7 +511,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.6";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.7";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -651,7 +651,7 @@
       var byProj={}; prj.forEach(function(p){ byProj[p.id]={id:p.id,name:p.name,position:p.position,tasks:[]}; });
       tks.forEach(function(r){ if(byProj[r.project_id]) byProj[r.project_id].tasks.push(rowToTask(r)); });
       state.projects=prj.map(function(p){return byProj[p.id];});
-      if(!state.projects.some(function(p){return p.id===state.activeProjectId;}))
+      if(state.activeProjectId!==ALL && !state.projects.some(function(p){return p.id===state.activeProjectId;}))
         state.activeProjectId=state.projects[0]?state.projects[0].id:"";
       loadedOnce=true; persist(); lastSync=Date.now(); updateSyncStatus();
       if(editingId && !taskById(editingId)) closeDrawer();
