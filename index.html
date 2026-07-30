@@ -522,7 +522,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.4";
+  var LS_KEY="pm_tracker_v3", VERSION="v3.5";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -837,7 +837,8 @@
   // Hide manager-only controls for technicians.
   function applyRoleUI(){
     var mgr=isManager();
-    [".proj-select","#addTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; });
+    var ps=$(".proj-select"); if(ps)ps.style.display="";  // everyone can switch projects (see new ones)
+    ["#projAdd","#projMenu","#addTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; }); // but only managers create/edit
     var teamBtn=$("#teamBtn"); if(teamBtn)teamBtn.style.display=mgr?"":"none";
     var mineWrap=$("#mineWrap"); if(mineWrap)mineWrap.style.display=mgr?"none":"";
     var rl=$("#roleLabel"); if(rl)rl.textContent=(me?(me.name||me.email):"")+" · "+(mgr?"Manager":"Technician");
