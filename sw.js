@@ -1,6 +1,6 @@
 /* Service worker: offline-first with fresh updates.
    Bump CACHE whenever app assets change so returning visitors refetch. */
-const CACHE = 'pm-tracker-v3-9';
+const CACHE = 'pm-tracker-v3-10';
 const ASSETS = [
   './',
   './index.html',
