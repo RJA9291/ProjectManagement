@@ -242,6 +242,25 @@
   .minibtn{border:1px solid var(--border);background:var(--surface);border-radius:5px;cursor:pointer;font-size:9px;line-height:1;padding:4px 5px;color:var(--text-dim);margin:0 1px}
   .minibtn:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
   .proj-chip{flex:none;font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-weak);padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+  .stage-badge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:650;padding:1px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.02em}
+  .drawer header .stage-badge{margin-left:8px}
+  .reject-banner{background:color-mix(in srgb,var(--s-blocked) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--s-blocked) 40%,var(--border));color:var(--s-blocked);border-radius:8px;padding:8px 10px;font-size:12.5px;font-weight:520}
+  .wf-actions{display:flex;gap:8px;flex-wrap:wrap;width:100%}
+  .wf-actions:empty{display:none}
+  .wf-actions .btn{flex:1;justify-content:center;min-width:130px}
+  .mgr-tools{display:flex;gap:8px;flex-wrap:wrap;width:100%;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .drawer footer{flex-direction:column;align-items:stretch}
+  .queue-head{margin:2px 0 6px}
+  .queue-head h2{margin:0;font-size:21px;letter-spacing:-.3px}
+  .qsec-h{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin:16px 2px 8px}
+  #queueList{display:flex;flex-direction:column;gap:10px}
+  .qcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column;gap:6px}
+  .qcard:hover{border-color:var(--accent)}
+  .qc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .qc-name{font-weight:620;font-size:15px;line-height:1.3}
+  .qc-meta{font-size:12.5px;color:var(--text-dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .qc-need{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--on-accent);background:var(--accent);padding:3px 10px;border-radius:20px}
+  .role-hint{font-size:10.5px;color:var(--text-dim);font-style:italic}
 
   /* ---------- Print ---------- */
   @media print{
@@ -374,6 +393,12 @@
     <p class="hint">Baseline = original commitment · Planned = current plan · the solid inner bar = actual dates (or % progress along the plan when actuals aren't set yet). The red line marks today.</p>
   </div>
 
+  <!-- SIMPLE QUEUE VIEW (technician / assistant engineer) -->
+  <div id="queueView" style="display:none">
+    <div class="queue-head"><h2 id="queueTitle">My tasks</h2><div id="queueSub" class="hint"></div></div>
+    <div id="queueList"></div>
+  </div>
+
   <div class="foot">
     <span id="verTag">v3</span>
     <span>·</span>
@@ -385,10 +410,12 @@
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-hidden="true">
   <header>
-    <span class="t" id="drawerTitle">Edit task</span>
+    <span class="t" id="drawerTitle">Task</span>
+    <span class="stage-badge" id="drawerStage"></span>
     <span class="wbs" id="drawerWbs"></span>
   </header>
   <div class="body">
+    <div id="rejectBanner" class="reject-banner" style="display:none"></div>
     <div class="field">
       <label for="fName">Task name / Nama tugas</label>
       <input id="fName" type="text" placeholder="e.g. Replace bearing on line 3">
@@ -400,6 +427,10 @@
       <div class="field"><label for="fPrio">Priority / Keutamaan</label>
         <select id="fPrio"><option>High</option><option selected>Medium</option><option>Low</option></select>
       </div>
+    </div>
+    <div class="field" id="verifierWrap" style="display:none">
+      <label for="fVerifier">Verifier (Assistant Engineer) / Pengesah</label>
+      <select id="fVerifier"></select>
     </div>
     <div class="field" id="moveProjWrap" style="display:none">
       <label for="fMoveProj">Project / Projek <span class="fieldhint">(move this task &amp; its sub-tasks)</span></label>
@@ -460,10 +491,13 @@
     <input type="file" id="fPhoto" accept="image/*" style="display:none">
   </div>
   <footer>
-    <button class="btn" id="addSub">+ Sub-task</button>
-    <button class="btn icon" id="moveUp" title="Move up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
-    <button class="btn icon" id="moveDown" title="Move down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>
-    <button class="btn del" id="delTask">Delete</button>
+    <div class="wf-actions" id="wfActions"></div>
+    <div class="mgr-tools" id="mgrTools">
+      <button class="btn" id="addSub">+ Sub-task</button>
+      <button class="btn icon" id="moveUp" title="Move up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
+      <button class="btn icon" id="moveDown" title="Move down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button class="btn del" id="delTask">Delete</button>
+    </div>
   </footer>
 </aside>
 
@@ -512,7 +546,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v3.10";
+  var LS_KEY="pm_tracker_v3", VERSION="v4.0";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -545,7 +579,14 @@
   var editingId=null;
   var loadedOnce=false;
   function isManager(){ return !!(me && me.role==="manager"); }
+  function isAE(){ return !!(me && me.role==="assistant_engineer"); }
   function myRole(){ return me?me.role:"unassigned"; }
+  function roleLabelOf(r){ return r==="manager"?"Manager":r==="assistant_engineer"?"Assistant Engineer":r==="technician"?"Technician":"Unassigned"; }
+  function isVerifier(t){ return !!(me && t && t.verifier===me.id); }
+  function isWorker(t){ return !!(me && t && t.assignee===me.id); }
+  var STAGES={ open:{label:"Open",c:"--s-notstarted"}, pending_verify:{label:"To verify",c:"--s-inprogress"},
+    pending_confirm:{label:"To confirm",c:"--s-onhold"}, closed:{label:"Closed",c:"--s-completed"} };
+  function stageInfo(t){ return STAGES[(t&&t.stage)] || STAGES.open; }
   function profileName(id){ var p=profiles.filter(function(x){return x.id===id;})[0]; return p?(p.name||p.email):""; }
   function collapsedSet(){ try{return JSON.parse(localStorage.getItem("pm_collapsed_v3")||"{}");}catch(e){return {};} }
   function setCollapsed(id,val){ var c=collapsedSet(); if(val)c[id]=1; else delete c[id]; try{localStorage.setItem("pm_collapsed_v3",JSON.stringify(c));}catch(e){} }
@@ -581,7 +622,10 @@
       actStart:r.act_start||"", actEnd:r.act_end||"", dependency:r.dependency||"", remarks:r.remarks||"",
       assignee:r.assignee||"", instructionPhoto:r.instruction_photo||"", completionPhoto:r.completion_photo||"",
       toolCribItems:r.tool_crib_items||"", closeDate:r.close_date||"", techRemarks:r.tech_remarks||"",
-      inProgressReason:r.in_progress_reason||"", collapsed:!!collapsedSet()[r.id]};
+      inProgressReason:r.in_progress_reason||"",
+      stage:r.stage||"open", verifier:r.verifier||"", rejectReason:r.reject_reason||"",
+      submittedAt:r.submitted_at||"", verifiedAt:r.verified_at||"", confirmedAt:r.confirmed_at||"",
+      collapsed:!!collapsedSet()[r.id]};
   }
   function taskToRow(t){
     return {id:t.id, project_id:t.projectId, parent_id:t.parentId||null, position:t.position||0,
@@ -590,7 +634,10 @@
       act_start:t.actStart||null, act_end:t.actEnd||null, dependency:t.dependency||"", remarks:t.remarks||"",
       assignee:t.assignee||null, instruction_photo:t.instructionPhoto||null, completion_photo:t.completionPhoto||null,
       tool_crib_items:t.toolCribItems||"", close_date:t.closeDate||null, tech_remarks:t.techRemarks||"",
-      in_progress_reason:t.inProgressReason||"", updated_at:nowISO()};
+      in_progress_reason:t.inProgressReason||"",
+      stage:t.stage||"open", verifier:t.verifier||null, reject_reason:t.rejectReason||"",
+      submitted_at:t.submittedAt||null, verified_at:t.verifiedAt||null, confirmed_at:t.confirmedAt||null,
+      updated_at:nowISO()};
   }
 
   /* ================= Cloud sync (Supabase REST) ================= */
@@ -829,14 +876,15 @@
     $("#gSignin").onclick=function(){go(false);};
     $("#gSignup").onclick=function(){go(true);};
   }
-  // Hide manager-only controls for technicians.
+  // Managers get the full tool; technician/assistant-engineer get the simple queue (see render()).
   function applyRoleUI(){
     var mgr=isManager();
-    var ps=$(".proj-select"); if(ps)ps.style.display="";  // everyone can switch projects (see new ones)
-    ["#projAdd","#projMenu","#addTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; }); // but only managers create/edit
+    var ps=$(".proj-select"); if(ps)ps.style.display=mgr?"":"none";   // non-managers use the queue (all projects)
+    ["#projAdd","#projMenu","#addTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; });
     var teamBtn=$("#teamBtn"); if(teamBtn)teamBtn.style.display=mgr?"":"none";
-    var mineWrap=$("#mineWrap"); if(mineWrap)mineWrap.style.display=mgr?"none":"";
-    var rl=$("#roleLabel"); if(rl)rl.textContent=(me?(me.name||me.email):"")+" · "+(mgr?"Manager":"Technician");
+    var mineWrap=$("#mineWrap"); if(mineWrap)mineWrap.style.display="none";
+    var rl=$("#roleLabel"); if(rl)rl.textContent=(me?(me.name||me.email):"")+" · "+roleLabelOf(myRole());
+    render();
   }
 
   /* ---------------- Team & roles (manager) ---------------- */
@@ -851,6 +899,7 @@
       html+='<div class="team-row"><div class="who"><div class="nm">'+esc(p.name||p.email||"—")+meTag+'</div><div class="em">'+esc(p.email||"")+'</div></div>'+
         '<select data-role-for="'+p.id+'">'+
         '<option value="manager"'+(p.role==="manager"?" selected":"")+'>Manager</option>'+
+        '<option value="assistant_engineer"'+(p.role==="assistant_engineer"?" selected":"")+'>Assistant Engineer</option>'+
         '<option value="technician"'+(p.role==="technician"?" selected":"")+'>Technician</option>'+
         '<option value="unassigned"'+(p.role==="unassigned"?" selected":"")+'>Unassigned</option>'+
         '</select></div>';
@@ -923,8 +972,8 @@
   }
   function renderPhotoSection(task){
     if(!task)return;
-    photoBlock("instruction",task.instructionPhoto,canEditInstruction(task),"Instruction photo");
-    photoBlock("completion",task.completionPhoto,canEditCompletion(task),"Completion photo");
+    photoBlock("instruction",task.instructionPhoto,(typeof drawerEdit!=="undefined"&&drawerEdit)&&canEditPlan(task),"Instruction photo");
+    photoBlock("completion",task.completionPhoto,(typeof drawerEdit!=="undefined"&&drawerEdit)&&canEditWork(task),"Completion photo");
   }
 
   /* ---------------- Date helpers ---------------- */
@@ -1069,7 +1118,9 @@
           '</div></td>'+
         '<td>'+esc(profileName(t.assignee)||"—")+'</td>'+
         '<td>'+(t.priority?'<span class="prio '+t.priority+'">'+t.priority+'</span>':"—")+'</td>'+
-        '<td><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span></td>'+
+        '<td><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span>'+
+          ((t.stage&&t.stage!=="open")?' <span class="stage-badge" style="background:color-mix(in srgb,var('+stageInfo(t).c+') 18%,transparent);color:var('+stageInfo(t).c+')">'+stageInfo(t).label+'</span>':'')+
+        '</td>'+
         '<td class="num"><div class="pctcell"><span class="track"><i style="width:'+pct+'%;background:var('+st.c+')"></i></span><span class="n">'+pct+'</span></div></td>'+
         dcell(r.baseStart)+dcell(r.baseEnd)+dcell(r.planStart)+
         '<td class="date'+(overdue?" overdue":"")+(r.planEnd?"":" miss")+'">'+(r.planEnd?fmtY(r.planEnd):"—")+'</td>'+
@@ -1246,27 +1297,76 @@
 
   /* ---------------- Render all ---------------- */
   function render(){
-    renderKpis();
-    if(view==="table"){ $("#tableView").style.display=""; $("#ganttView").style.display="none"; renderTable(); }
-    else{ $("#tableView").style.display="none"; $("#ganttView").style.display=""; renderGantt(); }
+    var mgr=isManager();
+    if(mgr){
+      $("#kpis").style.display=""; $(".bar2").style.display=""; $("#queueView").style.display="none";
+      renderKpis();
+      if(view==="table"){ $("#tableView").style.display=""; $("#ganttView").style.display="none"; renderTable(); }
+      else{ $("#tableView").style.display="none"; $("#ganttView").style.display=""; renderGantt(); }
+    } else {
+      $("#kpis").style.display="none"; $(".bar2").style.display="none";
+      $("#tableView").style.display="none"; $("#ganttView").style.display="none";
+      $("#queueView").style.display=""; renderQueue();
+    }
     persist();
   }
   function refreshAll(){ renderProjSelect(); render(); }
 
-  /* ---------------- Drawer ---------------- */
-  function buildAssigneeOptions(selId){
-    var s=$("#fAssignee"); if(!s)return;
-    var opts='<option value="">— Unassigned —</option>';
-    profiles.filter(function(p){return p.role==="technician"||p.role==="manager";})
-      .forEach(function(p){ opts+='<option value="'+p.id+'"'+(p.id===selId?" selected":"")+'>'+esc((p.name||p.email)+" · "+p.role)+'</option>'; });
-    s.innerHTML=opts; s.value=selId||"";
+  /* ---------------- Simple queue (technician / assistant engineer) ---------------- */
+  function renderQueue(){
+    var meId=me?me.id:"";
+    var parentIds={}; state.projects.forEach(function(p){(p.tasks||[]).forEach(function(x){ if(x.parentId)parentIds[x.parentId]=1; });});
+    var action=[], waiting=[], done=[];
+    state.projects.forEach(function(p){ (p.tasks||[]).forEach(function(t){
+      if(parentIds[t.id])return;                     // skip roll-up parents
+      var worker=(t.assignee===meId), verifier=(t.verifier===meId);
+      if(!worker && !verifier)return;
+      var o={t:t,p:p,worker:worker,verifier:verifier};
+      var needsMe=(worker && t.stage==="open") || (verifier && t.stage==="pending_verify");
+      if(t.stage==="closed") done.push(o); else if(needsMe) action.push(o); else waiting.push(o);
+    }); });
+    $("#queueTitle").textContent="Hi, "+(me?(me.name||me.email):"")+" 👋";
+    $("#queueSub").textContent=(action.length? (action.length+" task"+(action.length>1?"s":"")+" need your action") : "Nothing needs your action right now")+" · "+roleLabelOf(myRole());
+    function card(o){
+      var t=o.t, si=stageInfo(t), st=STATUS_MAP[t.status]||STATUS[0];
+      var need = (o.worker&&t.stage==="open") ? (t.rejectReason?"Fix &amp; resubmit":"Do &amp; submit") : (o.verifier&&t.stage==="pending_verify") ? "Verify" : "";
+      return '<div class="qcard" data-id="'+t.id+'">'+
+        '<div class="qc-top"><span class="proj-chip">'+esc(o.p.name)+'</span>'+
+          '<span class="stage-badge" style="background:color-mix(in srgb,var('+si.c+') 18%,transparent);color:var('+si.c+')">'+si.label+'</span>'+
+          (o.verifier&&!o.worker?'<span class="role-hint">you verify</span>':'')+'</div>'+
+        '<div class="qc-name">'+esc(t.name||"(untitled)")+'</div>'+
+        '<div class="qc-meta"><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span>'+
+          (t.planEnd?' · Due '+fmtY(t.planEnd):'')+((t.instructionPhoto||t.completionPhoto)?' · 📷':'')+'</div>'+
+        (need?'<div class="qc-need">'+need+'</div>':'')+'</div>';
+    }
+    function section(title,arr){ return arr.length? '<div class="qsec-h">'+title+' ('+arr.length+')</div>'+arr.map(card).join("") : ""; }
+    var html=section("Needs your action",action)+section("Waiting",waiting)+section("Completed",done);
+    if(!action.length && !waiting.length && !done.length) html='<div class="empty">No tasks assigned to you yet.</div>';
+    $("#queueList").innerHTML=html;
   }
+
+  /* ---------------- Drawer ---------------- */
+  var drawerEdit=false;
+  function buildSelectOptions(sel, roles, selId, placeholder){
+    var el=$(sel); if(!el)return;
+    var opts='<option value="">'+placeholder+'</option>';
+    profiles.filter(function(p){return roles.indexOf(p.role)>=0;})
+      .forEach(function(p){ opts+='<option value="'+p.id+'"'+(p.id===selId?" selected":"")+'>'+esc((p.name||p.email)+" · "+roleLabelOf(p.role))+'</option>'; });
+    el.innerHTML=opts; el.value=selId||"";
+  }
+  function buildAssigneeOptions(selId){ buildSelectOptions("#fAssignee",["technician","assistant_engineer","manager"],selId,"— Unassigned —"); }
+  // Who may edit what — gated further by drawerEdit (view-first; tap Edit to change).
+  function canEditPlan(t){ return isManager() && t.stage!=="closed"; }
+  function canEditWork(t){ return (isManager() || (me&&t.assignee===me.id)) && t.stage==="open" && !hasChildren(t.id); }
   function openDrawer(id){
-    editingId=id; var t=taskById(id); if(!t)return;
-    var kids=hasChildren(id), r=resolve(t), wIdx=wbsIndex();
-    var mgr=isManager(), mine=(me&&t.assignee===me.id), canComplete=canEditCompletion(t);
+    editingId=id; drawerEdit=false; var t=taskById(id); if(!t)return;
+    var kids=hasChildren(id), r=resolve(t), wIdx=wbsIndex(), mgr=isManager();
     $("#drawerWbs").textContent=wIdx[id]||"";
-    $("#drawerTitle").textContent= kids?"Task (parent)":(mgr?"Edit task":(mine?"Complete task":"Task (view)"));
+    var si=stageInfo(t);
+    var sb=$("#drawerStage"); sb.textContent=si.label; sb.style.background="color-mix(in srgb,var("+si.c+") 18%,transparent)"; sb.style.color="var("+si.c+")";
+    $("#drawerTitle").textContent = kids?"Task (parent)":"Task";
+    var rb=$("#rejectBanner");
+    if(t.rejectReason && t.stage==="open"){ rb.style.display=""; rb.textContent="↩ Sent back: "+t.rejectReason; } else rb.style.display="none";
     $("#fName").value=t.name||"";
     $("#fPrio").value=t.priority||"Medium"; $("#fStatus").value=t.status||"not_started";
     $("#fPct").value= kids? r.percent : (t.percent||0);
@@ -1274,29 +1374,51 @@
     setD("#fPlanS",kids?r.planStart:t.planStart); setD("#fPlanE",kids?r.planEnd:t.planEnd);
     setD("#fActS",kids?r.actStart:t.actStart); setD("#fActE",kids?r.actEnd:t.actEnd);
     $("#fDep").value=t.dependency||""; $("#fRemark").value=t.remarks||"";
+    $("#fTool").value=t.toolCribItems||""; $("#fClose").value=t.closeDate||"";
+    $("#fTech").value=t.techRemarks||""; $("#fReason").value=t.inProgressReason||"";
+    $("#autoNote").style.display=kids?"":"none";
     buildAssigneeOptions(t.assignee);
-    // move-to-project (manager only) — only meaningful for top-level tasks with 2+ projects
+    var vWrap=$("#verifierWrap");
+    if(mgr && !kids){ buildSelectOptions("#fVerifier",["assistant_engineer","manager"],t.verifier,"— Choose Assistant Engineer —"); vWrap.style.display=""; } else vWrap.style.display="none";
     var mpWrap=$("#moveProjWrap"), mp=$("#fMoveProj");
     if(mgr && !t.parentId && state.projects.length>1){
       mp.innerHTML=state.projects.map(function(p){return '<option value="'+p.id+'"'+(p.id===t.projectId?" selected":"")+'>'+esc(p.name)+'</option>';}).join("");
       mp.value=t.projectId; mpWrap.style.display="";
     } else { mpWrap.style.display="none"; }
-    $("#fTool").value=t.toolCribItems||""; $("#fClose").value=t.closeDate||"";
-    $("#fTech").value=t.techRemarks||""; $("#fReason").value=t.inProgressReason||"";
-    $("#autoNote").style.display=kids?"":"none";
-    // enable/disable by role — manager edits the plan; assignee/manager fills completion
-    ["#fName","#fPrio","#fDep","#fRemark","#fAssignee"].forEach(function(sel){ $(sel).disabled=!mgr; });
-    ["#fBaseS","#fBaseE","#fPlanS","#fPlanE"].forEach(function(sel){ $(sel).disabled=!mgr||kids; });
-    ["#fStatus","#fPct","#fActS","#fActE","#fTool","#fClose","#fTech","#fReason"].forEach(function(sel){ $(sel).disabled=kids||!canComplete; });
-    renderPhotoSection(t);
-    ["#addSub","#moveUp","#moveDown","#delTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=mgr?"":"none"; });
+    applyDrawerLock(t);      // starts in view (read-only) mode
+    renderWfActions(t);
+    ["#addSub","#moveUp","#moveDown","#delTask"].forEach(function(sel){ var e=$(sel); if(e)e.style.display=(mgr&&!inAllMode())?"":"none"; });
+    $("#mgrTools").style.display= mgr?"":"none";
     $("#scrim").classList.add("open"); $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
-    if(mgr) setTimeout(function(){$("#fName").focus();},60);
     if(view==="table")renderTable();
     function setD(sel,v){ $(sel).value=v||""; }
   }
+  function applyDrawerLock(t){
+    var kids=hasChildren(t.id);
+    var planOn = drawerEdit && canEditPlan(t), workOn = drawerEdit && canEditWork(t);
+    ["#fName","#fPrio","#fDep","#fRemark","#fAssignee","#fVerifier","#fMoveProj"].forEach(function(sel){ var e=$(sel); if(e)e.disabled=!planOn; });
+    ["#fBaseS","#fBaseE","#fPlanS","#fPlanE"].forEach(function(sel){ var e=$(sel); if(e)e.disabled=!planOn||kids; });
+    ["#fStatus","#fPct","#fActS","#fActE","#fTool","#fClose","#fTech","#fReason"].forEach(function(sel){ var e=$(sel); if(e)e.disabled=!workOn; });
+    renderPhotoSection(t);
+  }
+  function setDrawerEdit(on,t){ drawerEdit=on; applyDrawerLock(t); renderWfActions(t); }
+  function renderWfActions(t){
+    var box=$("#wfActions"); if(!box)return;
+    var mgr=isManager(), kids=hasChildren(t.id), h="";
+    if(canEditPlan(t) || canEditWork(t)){
+      h += drawerEdit ? '<button class="btn" data-wf="done">✓ Done editing</button>'
+                      : '<button class="btn primary" data-wf="edit">✎ Edit</button>';
+    }
+    if(!kids){
+      if((mgr||isWorker(t)) && t.stage==="open") h+='<button class="btn primary" data-wf="submit">Submit for verification</button>';
+      if((mgr||isVerifier(t)) && t.stage==="pending_verify") h+='<button class="btn primary" data-wf="verify">✓ Verify</button><button class="btn del" data-wf="reject">Reject</button>';
+      if(mgr && t.stage==="pending_confirm") h+='<button class="btn primary" data-wf="confirm">Confirm &amp; close</button><button class="btn del" data-wf="reject">Reject</button>';
+      if(mgr && t.stage==="closed") h+='<button class="btn" data-wf="reopen">Reopen</button>';
+    }
+    box.innerHTML=h;
+  }
   function closeDrawer(){
-    flushUpserts(); editingId=null;
+    flushUpserts(); editingId=null; drawerEdit=false;
     $("#scrim").classList.remove("open"); $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden","true");
     render();
   }
@@ -1304,14 +1426,14 @@
   function queueUpsert(t){ _upsertPend[t.id]=t; clearTimeout(_upsertTimer); _upsertTimer=setTimeout(flushUpserts,800); }
   function flushUpserts(){ clearTimeout(_upsertTimer); var list=Object.keys(_upsertPend); _upsertPend={}; list.forEach(function(k){ var t=taskById(k); if(t)upsertTask(t); }); }
   function commitDrawer(){
-    if(!editingId)return; var t=taskById(editingId); if(!t)return;
-    var kids=hasChildren(editingId), mgr=isManager(), canComplete=canEditCompletion(t);
-    if(mgr){
+    if(!editingId||!drawerEdit)return; var t=taskById(editingId); if(!t)return;
+    var kids=hasChildren(editingId);
+    if(canEditPlan(t)){
       t.name=$("#fName").value; t.priority=$("#fPrio").value;
       t.dependency=$("#fDep").value; t.remarks=$("#fRemark").value; t.assignee=$("#fAssignee").value||"";
-      if(!kids){ t.baseStart=$("#fBaseS").value; t.baseEnd=$("#fBaseE").value; t.planStart=$("#fPlanS").value; t.planEnd=$("#fPlanE").value; }
+      if(!kids){ t.verifier=$("#fVerifier").value||""; t.baseStart=$("#fBaseS").value; t.baseEnd=$("#fBaseE").value; t.planStart=$("#fPlanS").value; t.planEnd=$("#fPlanE").value; }
     }
-    if(canComplete && !kids){
+    if(canEditWork(t)){
       t.status=$("#fStatus").value; t.percent=clamp(+$("#fPct").value||0);
       t.actStart=$("#fActS").value; t.actEnd=$("#fActE").value;
       t.toolCribItems=$("#fTool").value; t.closeDate=$("#fClose").value;
@@ -1374,6 +1496,40 @@
     moved.forEach(function(mt){ upsertTask(mt); });
     state.activeProjectId=projId;
     save(); renderProjSelect(); closeDrawer(); toast("Moved to "+target.name);
+  }
+
+  /* ---------------- Workflow actions ---------------- */
+  function submitForVerify(t){
+    if(!(isManager()||isWorker(t)))return;
+    if(hasChildren(t.id)){ toast("Parent task can't be submitted."); return; }
+    if(!t.completionPhoto){ toast("Attach a completion/proof photo first."); return; }
+    t.stage="pending_verify"; t.submittedAt=nowISO(); t.rejectReason=""; t.verifiedAt="";
+    if(t.status==="not_started")t.status="in_progress";
+    upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Submitted for verification.");
+  }
+  function verifyApprove(t){
+    if(!(isManager()||isVerifier(t)))return;
+    if(t.stage!=="pending_verify"){ toast("Not awaiting verification."); return; }
+    t.stage="pending_confirm"; t.verifiedAt=nowISO();
+    upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Verified — awaiting manager confirmation.");
+  }
+  function rejectTask(t){
+    if(!(isManager()||isVerifier(t)))return;
+    var reason=prompt("Reason for sending back / Sebab tolak:",""); if(reason===null)return;
+    t.stage="open"; t.rejectReason=(reason||"(no reason given)"); t.submittedAt=""; t.verifiedAt="";
+    upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Sent back to the worker.");
+  }
+  function confirmClose(t){
+    if(!isManager())return;
+    if(t.stage!=="pending_confirm"){ toast("Not awaiting confirmation."); return; }
+    t.stage="closed"; t.status="completed"; t.percent=100; t.confirmedAt=nowISO();
+    if(!t.closeDate)t.closeDate=new Date().toISOString().slice(0,10);
+    upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Issue closed. 🎉");
+  }
+  function reopenTask(t){
+    if(!isManager())return;
+    t.stage="open"; t.confirmedAt=""; t.verifiedAt=""; t.submittedAt="";
+    upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Reopened.");
   }
 
   /* ---------------- Export PNG ---------------- */
@@ -1553,6 +1709,7 @@
       if(mv){ e.stopPropagation(); move(mv.getAttribute("data-id"), mv.getAttribute("data-move")==="up"?-1:1); if(view==="table")renderTable(); else renderGantt(); return; }
       var tr=e.target.closest("tr[data-id]"); if(tr)openDrawer(tr.getAttribute("data-id"));
     });
+    $("#queueList").addEventListener("click",function(e){ var c=e.target.closest(".qcard[data-id]"); if(c)openDrawer(c.getAttribute("data-id")); });
 
     $("#addTask").addEventListener("click",function(){addTask(null);});
     $("#search").addEventListener("input",function(e){filter=e.target.value; if(view==="table")renderTable(); else renderGantt();});
@@ -1561,6 +1718,18 @@
     ["#fName","#fPrio","#fStatus","#fPct","#fBaseS","#fBaseE","#fPlanS","#fPlanE","#fActS","#fActE","#fDep","#fRemark","#fAssignee","#fTool","#fClose","#fTech","#fReason"]
       .forEach(function(sel){ var el=$(sel); if(!el)return; el.addEventListener("input",commitDrawer); el.addEventListener("change",commitDrawer); });
     $("#fMoveProj").addEventListener("change",function(e){ if(editingId)moveTaskToProject(editingId, e.target.value); });
+    // workflow action buttons (Edit / Submit / Verify / Reject / Confirm / Reopen)
+    $("#wfActions").addEventListener("click",function(e){
+      var b=e.target.closest("[data-wf]"); if(!b||!editingId)return;
+      var t=taskById(editingId); if(!t)return; var a=b.getAttribute("data-wf");
+      if(a==="edit"){ setDrawerEdit(true,t); }
+      else if(a==="done"){ commitDrawer(); setDrawerEdit(false,t); }
+      else if(a==="submit"){ commitDrawer(); submitForVerify(t); }
+      else if(a==="verify"){ verifyApprove(t); }
+      else if(a==="reject"){ rejectTask(t); }
+      else if(a==="confirm"){ confirmClose(t); }
+      else if(a==="reopen"){ reopenTask(t); }
+    });
     // photo add/replace/open/remove (delegated); one hidden file input, remember which slot
     var pendingSlot="instruction";
     $("#drawer").addEventListener("click",function(e){
