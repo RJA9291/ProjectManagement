@@ -554,7 +554,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v4.1";
+  var LS_KEY="pm_tracker_v3", VERSION="v4.2";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -1524,9 +1524,9 @@
   function submitForVerify(t){
     if(!(isManager()||isWorker(t)))return;
     if(hasChildren(t.id)){ toast("Parent task can't be submitted."); return; }
+    if(t.status!=="completed"){ toast("Set the status to Completed before submitting."); return; }
     if(!(t.completionPhotos&&t.completionPhotos.length)){ toast("Attach at least one completion/proof photo first."); return; }
     t.stage="pending_verify"; t.submittedAt=nowISO(); t.rejectReason=""; t.verifiedAt="";
-    if(t.status==="not_started")t.status="in_progress";
     upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Submitted for verification.");
   }
   function verifyApprove(t){
