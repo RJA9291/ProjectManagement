@@ -226,6 +226,14 @@
   .cloud-msg{font-size:12.5px;color:var(--s-blocked);line-height:1.4}
   .cloud-status{font-size:12.5px;color:var(--text-dim)}
   .photobox{margin-top:2px}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:8px}
+  .photo-thumb{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--surface-2);flex:none}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo-x{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .photo-x:hover{background:var(--s-blocked)}
+  .photo-add{width:80px;height:80px;border-radius:8px;border:1.5px dashed var(--border-strong);background:var(--surface-2);color:var(--text-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:560;flex:none}
+  .photo-add small{font-size:9.5px;color:var(--text-faint)}
+  .photo-add:hover{border-color:var(--accent);color:var(--accent)}
   .photo-empty{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .photo-has{display:flex;gap:12px}
   .photo-has img{width:92px;height:92px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer}
@@ -508,7 +516,7 @@
       <label>Completion photo / Gambar siap <span class="fieldhint">(technician)</span></label>
       <div id="completionPhotoBox" class="photobox"></div>
     </div>
-    <input type="file" id="fPhoto" accept="image/*" style="display:none">
+    <input type="file" id="fPhoto" accept="image/*" multiple style="display:none">
   </div>
   <footer>
     <div class="wf-actions" id="wfActions"></div>
@@ -566,7 +574,7 @@
 <script>
 (function(){
   "use strict";
-  var LS_KEY="pm_tracker_v3", VERSION="v4.0";
+  var LS_KEY="pm_tracker_v3", VERSION="v4.1";
   var $=function(s,r){return (r||document).querySelector(s);};
   var uid=function(){return Math.random().toString(36).slice(2,9);};
 
@@ -604,6 +612,7 @@
   function roleLabelOf(r){ return r==="manager"?"Manager":r==="assistant_engineer"?"Assistant Engineer":r==="technician"?"Technician":"Unassigned"; }
   function isVerifier(t){ return !!(me && t && t.verifier===me.id); }
   function isWorker(t){ return !!(me && t && t.assignee===me.id); }
+  function hasPhotos(t){ return !!((t.instructionPhotos&&t.instructionPhotos.length)||(t.completionPhotos&&t.completionPhotos.length)); }
   var STAGES={ open:{label:"Open",c:"--s-notstarted"}, pending_verify:{label:"To verify",c:"--s-inprogress"},
     pending_confirm:{label:"To confirm",c:"--s-onhold"}, closed:{label:"Closed",c:"--s-completed"} };
   function stageInfo(t){ return STAGES[(t&&t.stage)] || STAGES.open; }
@@ -635,12 +644,15 @@
 
   // ---- row <-> task mappers (DB snake_case <-> app camelCase) ----
   var uuid=function(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():(uid()+uid()+"-"+Date.now()); };
+  // Photos stored as a JSON array of storage paths in a text column. Legacy single-path values still work.
+  function parsePhotos(v){ if(!v)return []; if(typeof v==="string"){ if(v.charAt(0)==="["){ try{var a=JSON.parse(v); return Array.isArray(a)?a:[];}catch(e){return [];} } return [v]; } return Array.isArray(v)?v:[]; }
+  function serializePhotos(arr){ return (arr&&arr.length)?JSON.stringify(arr):null; }
   function rowToTask(r){
     return {id:r.id, projectId:r.project_id, parentId:r.parent_id||null, position:r.position||0,
       name:r.name||"", priority:r.priority||"Medium", status:r.status||"not_started", percent:r.percent||0,
       baseStart:r.base_start||"", baseEnd:r.base_end||"", planStart:r.plan_start||"", planEnd:r.plan_end||"",
       actStart:r.act_start||"", actEnd:r.act_end||"", dependency:r.dependency||"", remarks:r.remarks||"",
-      assignee:r.assignee||"", instructionPhoto:r.instruction_photo||"", completionPhoto:r.completion_photo||"",
+      assignee:r.assignee||"", instructionPhotos:parsePhotos(r.instruction_photo), completionPhotos:parsePhotos(r.completion_photo),
       toolCribItems:r.tool_crib_items||"", closeDate:r.close_date||"", techRemarks:r.tech_remarks||"",
       inProgressReason:r.in_progress_reason||"",
       stage:r.stage||"open", verifier:r.verifier||"", rejectReason:r.reject_reason||"",
@@ -652,7 +664,7 @@
       name:t.name||"", priority:t.priority||"Medium", status:t.status||"not_started", percent:clamp(+t.percent||0),
       base_start:t.baseStart||null, base_end:t.baseEnd||null, plan_start:t.planStart||null, plan_end:t.planEnd||null,
       act_start:t.actStart||null, act_end:t.actEnd||null, dependency:t.dependency||"", remarks:t.remarks||"",
-      assignee:t.assignee||null, instruction_photo:t.instructionPhoto||null, completion_photo:t.completionPhoto||null,
+      assignee:t.assignee||null, instruction_photo:serializePhotos(t.instructionPhotos), completion_photo:serializePhotos(t.completionPhotos),
       tool_crib_items:t.toolCribItems||"", close_date:t.closeDate||null, tech_remarks:t.techRemarks||"",
       in_progress_reason:t.inProgressReason||"",
       stage:t.stage||"open", verifier:t.verifier||null, reject_reason:t.rejectReason||"",
@@ -726,10 +738,17 @@
     });
   }
   // ---- per-row DB writes (RLS decides who may write) ----
+  // UPDATE an existing row via PATCH — passes the update policy (manager OR assignee OR verifier).
   function upsertTask(t){
     if(!signedIn())return Promise.resolve();
-    return sbRest("tasks?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(taskToRow(t))})
+    return sbRest("tasks?id=eq."+t.id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(taskToRow(t))})
       .then(function(r){ if(!r.ok){ r.text().then(function(x){ toast("Couldn't save — "+shortErr(x)); }); } });
+  }
+  // INSERT a new row (managers only, per RLS). Used when creating a task.
+  function insertTask(t){
+    if(!signedIn())return Promise.resolve();
+    return sbRest("tasks",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(taskToRow(t))})
+      .then(function(r){ if(!r.ok){ r.text().then(function(x){ toast("Couldn't create — "+shortErr(x)); }); } });
   }
   function deleteTaskRows(ids){
     if(!signedIn()||!ids.length)return Promise.resolve();
@@ -819,27 +838,32 @@
   function photoPending(){ try{return JSON.parse(localStorage.getItem("pm_pending_photos")||"{}");}catch(e){return {};} }
   function setPending(path,on){ var m=photoPending(); if(on)m[path]=1; else delete m[path]; try{localStorage.setItem("pm_pending_photos",JSON.stringify(m));}catch(e){} }
 
-  // slot = 'instruction' (manager) | 'completion' (assignee/manager)
-  function attachPhoto(task,slot,file){
+  // slot = 'instruction' (manager) | 'completion' (assignee/manager). Supports multiple photos.
+  function attachPhotos(task,slot,files){
     if(!signedIn()){ openCloud(); return; }
-    if(!/^image\//.test(file.type||"")){ setPhotoMsg(slot,"Please choose an image file."); return; }
-    setPhotoMsg(slot,"Processing…");
-    compressImage(file).then(function(blob){
-      var field=slot+"Photo", oldPath=task[field];
-      var path=task.id+"/"+slot+"-"+uid()+".jpg";
-      return idbPut(path,blob).then(function(){
-        return uploadPhoto(path,blob).then(function(ok){
-          if(!ok){ setPending(path,1); setPhotoMsg(slot,"Saved on this device — will upload when back online."); }
-          else setPhotoMsg(slot,"");
-          task[field]=path; upsertTask(task); renderPhotoSection(task); renderTable();
-          if(oldPath&&oldPath!==path){ idbDel(oldPath); deletePhotoObj(oldPath); setPending(oldPath,0); }
+    var field=slot+"Photos"; if(!task[field])task[field]=[];
+    var list=[].slice.call(files).filter(function(f){return /^image\//.test(f.type||"");});
+    if(!list.length){ setPhotoMsg(slot,"Please choose image file(s)."); return; }
+    setPhotoMsg(slot,"Processing "+list.length+" photo(s)…");
+    var i=0, offline=false;
+    (function next(){
+      if(i>=list.length){ upsertTask(task); save(); renderPhotoSection(task); renderTable(); setPhotoMsg(slot,offline?"Some saved on device — will upload when online.":""); return; }
+      var f=list[i++];
+      compressImage(f).then(function(blob){
+        var path=task.id+"/"+slot+"-"+uid()+".jpg";
+        return idbPut(path,blob).then(function(){
+          return uploadPhoto(path,blob).then(function(ok){
+            if(!ok){ setPending(path,1); offline=true; }
+            task[field].push(path); renderPhotoSection(task); next();
+          });
         });
-      });
-    }).catch(function(){ setPhotoMsg(slot,"Couldn't process that image."); });
+      }).catch(function(){ next(); });
+    })();
   }
-  function removePhoto(task,slot){
-    var field=slot+"Photo", p=task[field]; task[field]=""; upsertTask(task); renderPhotoSection(task); renderTable();
-    if(p){ idbDel(p); deletePhotoObj(p); setPending(p,0); }
+  function removePhoto(task,slot,path){
+    var field=slot+"Photos"; task[field]=(task[field]||[]).filter(function(p){return p!==path;});
+    upsertTask(task); save(); renderPhotoSection(task); renderTable();
+    if(path){ idbDel(path); deletePhotoObj(path); setPending(path,0); }
   }
   function uploadPending(){
     if(!signedIn())return; var m=photoPending();
@@ -973,27 +997,25 @@
     }
   }
   function setPhotoMsg(slot,m){ var e=$("#"+slot+"Msg"); if(e)e.textContent=m; }
-  function photoBlock(slot,path,canEdit,label){
+  function photoBlock(slot,paths,canEdit){
     var box=$("#"+slot+"PhotoBox"); if(!box)return;
-    var thumbId=slot+"Thumb";
-    if(path){
-      box.innerHTML='<div class="photo-has"><img id="'+thumbId+'" alt="'+label+'"><div class="photo-meta"><div class="nm">'+label+'</div>'+
-        '<div class="photo-acts">'+(canEdit?'<button class="btn sm" data-pa="replace" data-slot="'+slot+'">Replace</button>':'')+
-        '<button class="btn sm" data-pa="open" data-slot="'+slot+'">Open</button>'+
-        (canEdit?'<button class="btn sm del" data-pa="remove" data-slot="'+slot+'">Remove</button>':'')+
-        '</div></div></div><div class="cloud-msg" id="'+slot+'Msg"></div>';
-      var img=$("#"+thumbId); displayPhoto(path,img); img.style.cursor="pointer";
-      img.onclick=function(){ if(img.src)window.open(img.src,"_blank"); };
-    }else{
-      box.innerHTML= canEdit
-        ? '<div class="photo-empty"><button class="btn sm" data-pa="add" data-slot="'+slot+'">+ Add photo</button><span class="autonote">Shrinks to ≤1MB automatically.</span></div><div class="cloud-msg" id="'+slot+'Msg"></div>'
-        : '<div class="autonote">No photo yet.</div>';
-    }
+    paths=paths||[];
+    var h='<div class="photo-grid">';
+    paths.forEach(function(p){
+      h+='<div class="photo-thumb"><img alt="photo" data-ph="'+esc(p)+'">'+(canEdit?'<button class="photo-x" data-pa="remove" data-slot="'+slot+'" data-path="'+esc(p)+'" title="Remove">×</button>':'')+'</div>';
+    });
+    if(canEdit) h+='<button class="photo-add" data-pa="add" data-slot="'+slot+'">+ Add<small>photos</small></button>';
+    h+='</div>';
+    if(!paths.length && !canEdit) h='<div class="autonote">No photos.</div>';
+    h+='<div class="cloud-msg" id="'+slot+'Msg"></div>';
+    box.innerHTML=h;
+    [].forEach.call(box.querySelectorAll('img[data-ph]'),function(img){ displayPhoto(img.getAttribute('data-ph'),img); img.style.cursor="pointer"; img.onclick=function(){ if(img.src)window.open(img.src,"_blank"); }; });
   }
   function renderPhotoSection(task){
     if(!task)return;
-    photoBlock("instruction",task.instructionPhoto,(typeof drawerEdit!=="undefined"&&drawerEdit)&&canEditPlan(task),"Instruction photo");
-    photoBlock("completion",task.completionPhoto,(typeof drawerEdit!=="undefined"&&drawerEdit)&&canEditWork(task),"Completion photo");
+    var ed=(typeof drawerEdit!=="undefined"&&drawerEdit);
+    photoBlock("instruction",task.instructionPhotos, ed&&canEditPlan(task));
+    photoBlock("completion",task.completionPhotos, ed&&canEditWork(task));
   }
 
   /* ---------------- Date helpers ---------------- */
@@ -1133,7 +1155,7 @@
           (inAllMode()?'<span class="proj-chip" title="Project">'+esc(projNameOf(t))+'</span>':'')+
           '<span class="dot" style="background:var('+st.c+')"></span>'+
           '<span class="name" title="'+esc(t.name)+'">'+esc(t.name||"(untitled)")+'</span>'+
-          ((t.instructionPhoto||t.completionPhoto)?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
+          (hasPhotos(t)?'<span class="photo-ind" title="Has photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg></span>':'')+
           ((me&&t.assignee===me.id)?'<span class="mine-tag" title="Assigned to you">You</span>':'')+
           '</div></td>'+
         '<td>'+esc(profileName(t.assignee)||"—")+'</td>'+
@@ -1356,7 +1378,7 @@
           (o.verifier&&!o.worker?'<span class="role-hint">you verify</span>':'')+'</div>'+
         '<div class="qc-name">'+esc(t.name||"(untitled)")+'</div>'+
         '<div class="qc-meta"><span class="pill" style="background:color-mix(in srgb,var('+st.c+') 15%,transparent);color:var('+st.c+')"><span class="d" style="background:var('+st.c+')"></span>'+st.label+'</span>'+
-          (t.planEnd?' · Due '+fmtY(t.planEnd):'')+((t.instructionPhoto||t.completionPhoto)?' · 📷':'')+'</div>'+
+          (t.planEnd?' · Due '+fmtY(t.planEnd):'')+(hasPhotos(t)?' · 📷':'')+'</div>'+
         (need?'<div class="qc-need">'+need+'</div>':'')+'</div>';
     }
     function section(title,arr){ return arr.length? '<div class="qsec-h">'+title+' ('+arr.length+')</div>'+arr.map(card).join("") : ""; }
@@ -1471,15 +1493,15 @@
     var pos=sibs.reduce(function(m,x){return Math.max(m,x.position||0);},0)+1;
     var t={id:uuid(),projectId:proj.id,parentId:parentId||null,position:pos,name:"",priority:"Medium",status:"not_started",percent:0,
       baseStart:"",baseEnd:"",planStart:"",planEnd:"",actStart:"",actEnd:"",dependency:"",remarks:"",
-      assignee:"",instructionPhoto:"",completionPhoto:"",toolCribItems:"",closeDate:"",techRemarks:"",inProgressReason:"",collapsed:false};
+      assignee:"",instructionPhotos:[],completionPhotos:[],toolCribItems:"",closeDate:"",techRemarks:"",inProgressReason:"",collapsed:false};
     proj.tasks.push(t);
     if(parentId){ var p=taskById(parentId); if(p){p.collapsed=false; setCollapsed(p.id,false);} }
-    upsertTask(t); save(); render(); openDrawer(t.id);
+    insertTask(t); save(); render(); openDrawer(t.id);
   }
   function deleteTask(id){
     if(!isManager())return;
     var ids=[id]; (function collect(pid){ children(pid).forEach(function(c){ids.push(c.id);collect(c.id);}); })(id);
-    ids.forEach(function(tid){ var tk=taskById(tid); if(tk){ ["instructionPhoto","completionPhoto"].forEach(function(f){ if(tk[f]){ idbDel(tk[f]); deletePhotoObj(tk[f]); } }); } });
+    ids.forEach(function(tid){ var tk=taskById(tid); if(tk){ (tk.instructionPhotos||[]).concat(tk.completionPhotos||[]).forEach(function(p){ idbDel(p); deletePhotoObj(p); }); } });
     state.projects.forEach(function(p){ p.tasks=(p.tasks||[]).filter(function(t){return ids.indexOf(t.id)<0;}); });
     deleteTaskRows(ids); save();
   }
@@ -1522,7 +1544,7 @@
   function submitForVerify(t){
     if(!(isManager()||isWorker(t)))return;
     if(hasChildren(t.id)){ toast("Parent task can't be submitted."); return; }
-    if(!t.completionPhoto){ toast("Attach a completion/proof photo first."); return; }
+    if(!(t.completionPhotos&&t.completionPhotos.length)){ toast("Attach at least one completion/proof photo first."); return; }
     t.stage="pending_verify"; t.submittedAt=nowISO(); t.rejectReason=""; t.verifiedAt="";
     if(t.status==="not_started")t.status="in_progress";
     upsertTask(t); save(); refreshAll(); closeDrawer(); toast("Submitted for verification.");
@@ -1643,7 +1665,7 @@
         name:t.name, assignee:nm[t.assignee]||"unassigned", priority:t.priority, status:t.status, percent:clamp(+t.percent||0),
         baseline:[t.baseStart||"",t.baseEnd||""], planned:[t.planStart||"",t.planEnd||""], actual:[t.actStart||"",t.actEnd||""],
         dependency:t.dependency||"", remarks:t.remarks||"", toolCribItems:t.toolCribItems||"", closeDate:t.closeDate||"",
-        techRemarks:t.techRemarks||"", inProgressReason:t.inProgressReason||"", hasInstructionPhoto:!!t.instructionPhoto, hasCompletionPhoto:!!t.completionPhoto
+        techRemarks:t.techRemarks||"", inProgressReason:t.inProgressReason||"", instructionPhotos:(t.instructionPhotos||[]).length, completionPhotos:(t.completionPhotos||[]).length
       };})};}) };
   }
   function aiAsk(q,hist){
@@ -1683,7 +1705,7 @@
     if(t.closeDate)L.push("Date closed: "+t.closeDate);
     if(t.inProgressReason)L.push("In-progress reason: "+t.inProgressReason);
     if(t.techRemarks)L.push("Technician remarks: "+t.techRemarks);
-    var ph=[]; if(t.instructionPhoto)ph.push("instruction"); if(t.completionPhoto)ph.push("completion");
+    var ph=[]; if((t.instructionPhotos||[]).length)ph.push((t.instructionPhotos.length)+" instruction"); if((t.completionPhotos||[]).length)ph.push((t.completionPhotos.length)+" completion");
     L.push("Photos: "+(ph.length?ph.join(" + "):"none"));
     return L.join("\n");
   }
@@ -1757,9 +1779,9 @@
       var slot=b.getAttribute("data-slot")||"instruction", act=b.getAttribute("data-pa");
       var t=editingId?taskById(editingId):null; if(!t)return;
       if(act==="add"||act==="replace"){ pendingSlot=slot; $("#fPhoto").click(); }
-      else if(act==="remove"){ if(confirm("Remove this photo?"))removePhoto(t,slot); }
+      else if(act==="remove"){ if(confirm("Remove this photo?"))removePhoto(t,slot,b.getAttribute("data-path")); }
     });
-    $("#fPhoto").addEventListener("change",function(e){ var f=e.target.files[0]; if(f&&editingId){ var t=taskById(editingId); if(t)attachPhoto(t,pendingSlot,f); } e.target.value=""; });
+    $("#fPhoto").addEventListener("change",function(e){ if(e.target.files.length&&editingId){ var t=taskById(editingId); if(t)attachPhotos(t,pendingSlot,e.target.files); } e.target.value=""; });
     $("#scrim").addEventListener("click",closeDrawer);
     $("#addSub").addEventListener("click",function(){ if(editingId){var pid=editingId; commitDrawer(); addTask(pid);} });
     $("#delTask").addEventListener("click",function(){ if(editingId && confirm("Delete this task"+(hasChildren(editingId)?" and its sub-tasks":"")+"?")){ deleteTask(editingId); closeDrawer(); } });
